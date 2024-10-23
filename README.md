@@ -1,7 +1,8 @@
 
 # ComfyUI Installation and Launcher for Windows
+![Header](readme_assets/header.png)
 
-This guide provides detailed instructions for setting up and running ComfyUI on Windows using Miniconda. Follow the steps below to ensure a successful installation.
+This guide provides detailed instructions for setting up and running ComfyUI on Windows using Miniconda. The goal is to simplify the installation process, integrate essential plugins for enhanced usability, and enable error correction with automatic relaunching of the server when needed. Additionally, it allows storing cache and models on separate drives, such as NAS or DAS storage, for optimized performance and storage management.
 
 ## Prerequisites
 
@@ -33,7 +34,10 @@ Before running the installer, ensure that your system meets the following requir
 1. **Clone this repository** or download the provided scripts:
    - Make sure `install_comfy_windows.bat` and `launch_comfyui.bat` are in the same directory.
 
-2. **Run the Installer**:
+2. **Edit the .env File**:
+   - Before running the installer, edit the `.env` file to set your custom paths, environment options, and other variables like model paths or directories. This file allows you to specify the location of models, cache, and other configurations to use external drives like NAS or DAS for storage.
+
+3. **Run the Installer**:
    - Open a terminal or Command Prompt and run:
 
      ```bash
@@ -60,21 +64,6 @@ Before running the installer, ensure that your system meets the following requir
      http://127.0.0.1:8188
      ```
 
-## Customization
-
-- **Model Paths**: The script will automatically create or update an `extra_model_paths.yaml` file in the ComfyUI directory. You can manually edit this file to change model paths as needed.
-- **Input, Output, and Temp Directories**: Modify the `launch_comfyui.bat` script to change the paths for `--input-directory`, `--output-directory`, and `--temp-directory`.
-
-## Environment Variables
-
-The following environment variables are set during the launch process to optimize performance:
-
-- `PYTORCH_CUDA_ALLOC_CONF`: Configured for expandable segments to manage CUDA memory.
-- `CUDA_LAUNCH_BLOCKING`: Ensures CUDA operations are synchronous.
-- `TORCH_USE_CUDA_DSA`: Enables CUDA Dynamic Shape Allocation for better memory handling.
-
-Feel free to adjust these settings in `launch_comfyui.bat` if needed.
-
 ## Uninstallation
 
 To remove the ComfyUI environment and all installed plugins:
@@ -86,16 +75,62 @@ To remove the ComfyUI environment and all installed plugins:
    conda env remove -n ComfyUI
    ```
 
-3. Delete the `ComfyUI` directory manually:
+3. Run the uninstallation script provided:
 
    ```bash
-   rmdir /S /Q %USERPROFILE%\ComfyUI
+   uninstall_comfyui.bat
    ```
 
-## Troubleshooting
+   This will clean up the installed files and directories.
 
-- **`conda init` Error**: If you see an error about needing to run `conda init`, ensure you close and reopen your terminal after running `conda init` as instructed in the prerequisites.
-- **Missing `onnxruntime-gpu`**: If `onnxruntime-gpu` fails to install, ensure that you have a compatible version of the NVIDIA driver and CUDA installed.
+## Updating ComfyUI
+
+To update ComfyUI and all installed plugins, run:
+
+```bash
+update_comfyui.bat
+```
+
+This script pulls the latest changes from the repositories for both ComfyUI and its plugins.
+
+### Schedule Automatic Updates
+
+To automate updates, you can schedule a task to run the update script every Sunday at 12:00 AM GMT. This task will stop the running ComfyUI service, run the update, and restart the service. Follow these steps:
+
+1. Open PowerShell as an Administrator.
+2. Run the following command to create a scheduled task:
+
+   ```powershell
+   schtasks /create /tn "UpdateComfyUI" /tr "powershell -Command "Stop-Service ComfyUI; Start-Process 'C:\path\to\update_comfyui.bat' -Wait; Start-Service ComfyUI"" /sc weekly /d SUN /st 00:00
+   ```
+
+   Replace `C:\path\to\` with the actual path where `update_comfyui.bat` is located. This will schedule the update to run every Sunday at midnight GMT.
+
+## Running as a Service with NSSM
+
+To run ComfyUI as a service using `nssm.exe`, follow these steps:
+
+1. **Download NSSM**:
+   - Get the NSSM executable from [nssm.cc](https://nssm.cc/download).
+   
+2. **Install ComfyUI as a Service**:
+   - Run the following commands in a terminal:
+
+     ```bash
+     nssm install ComfyUI
+     ```
+
+   - In the NSSM setup window, configure the path to `launch_comfyui.bat` as the application start file.
+   - Set the service to run as the user account instead of the local service account for proper file access.
+
+3. **Start the Service**:
+   - Start the service using:
+
+     ```bash
+     nssm start ComfyUI
+     ```
+
+   - ComfyUI will now run as a background service, automatically starting with Windows and restarting if it encounters errors.
 
 ## Acknowledgments
 
