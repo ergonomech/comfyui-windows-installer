@@ -8,30 +8,37 @@ import psutil
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
-# Configuration values from .env
+# Get default paths based on user profile
 USER_HOME = os.getenv("USERPROFILE")
-CONDA_PATH = os.getenv("CONDA_PATH", os.path.join(USER_HOME, "miniconda3"))
+DEFAULT_CONDA_PATH = os.path.join(USER_HOME, "miniconda3")
+DEFAULT_COMFYUI_DIR = os.path.join(USER_HOME, "ComfyUI")
+DEFAULT_LOG_DIR = os.path.join(DEFAULT_COMFYUI_DIR, "logs")
+
+# Read environment variables with fallbacks to defaults
+CONDA_PATH = os.getenv("CONDA_PATH", DEFAULT_CONDA_PATH)
 COMFYUI_ENV_NAME = os.getenv("COMFYUI_ENV_NAME", "ComfyUI")
-COMFYUI_DIR = os.getenv("COMFYUI_DIR", os.path.join(USER_HOME, "ComfyUI"))
+COMFYUI_DIR = os.getenv("COMFYUI_DIR", DEFAULT_COMFYUI_DIR)
 MODEL_BASE_PATH = os.getenv("MODEL_BASE_PATH")
 INPUT_DIR = os.getenv("INPUT_DIR")
 OUTPUT_DIR = os.getenv("OUTPUT_DIR")
 TEMP_DIR = os.getenv("TEMP_DIR")
-USE_CUSTOM_PATHS = os.getenv("USE_CUSTOM_PATHS", "false").lower() == "true"
 SERVER_PORT = os.getenv("SERVER_PORT", "8188")
 CUSTOM_PARAMETERS = os.getenv("CUSTOM_PARAMETERS", "")
 MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", 10))
 BOOT_WAIT_TIME = int(os.getenv("BOOT_WAIT_TIME", 30))
-LOG_DIR = os.getenv("LOG_DIR", "logs")
+LOG_DIR = os.getenv("LOG_DIR", DEFAULT_LOG_DIR)
 
 # Create log directory if it doesn't exist
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Set environment variables for PyTorch, CUDA, etc.
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["CUDA_AUTO_BOOST"] = "0"
+os.environ["CUDA_AUTO_BOOST"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True,max_split_size_mb:512"
+os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
 
 def setup_logger(log_type="script"):
     """Set up logging to a daily file for script runner or ComfyUI logs."""
@@ -63,6 +70,34 @@ def clean_old_logs():
             except ValueError:
                 pass  # Ignore files that don't match the date pattern
 
+def create_extra_model_paths_yaml():
+    """Create or update the extra_model_paths.yaml if MODEL_BASE_PATH is provided."""
+    if MODEL_BASE_PATH:
+        yaml_content = f"""
+comfyui:
+  base_path: {MODEL_BASE_PATH}
+  is_default: true
+  checkpoints: checkpoints
+  clip: clip
+  clip_vision: clip_vision
+  configs: configs
+  controlnet: controlnet
+  diffusion_models: |
+    diffusion_models
+    unet
+  embeddings: embeddings
+  loras: loras
+  upscale_models: upscale_models
+  vae: vae
+"""
+        # Ensure the ComfyUI directory exists
+        os.makedirs(COMFYUI_DIR, exist_ok=True)
+
+        yaml_path = os.path.join(COMFYUI_DIR, "extra_model_paths.yaml")
+        with open(yaml_path, "w") as yaml_file:
+            yaml_file.write(yaml_content)
+        log(f"Created or updated {yaml_path}")
+
 def terminate_existing_comfyui():
     """Terminate any running instance of ComfyUI using the specified port."""
     for process in psutil.process_iter(['pid', 'name', 'cmdline']):
@@ -86,13 +121,13 @@ def launch_comfyui():
     if CUSTOM_PARAMETERS:
         args += CUSTOM_PARAMETERS.split()
 
-    # Add custom paths if enabled
-    if USE_CUSTOM_PATHS:
-        args += [
-            f"--input-directory={INPUT_DIR}",
-            f"--output-directory={OUTPUT_DIR}",
-            f"--temp-directory={TEMP_DIR}"
-        ]
+    # Add custom paths if defined
+    if INPUT_DIR:
+        args.append(f"--input-directory={INPUT_DIR}")
+    if OUTPUT_DIR:
+        args.append(f"--output-directory={OUTPUT_DIR}")
+    if TEMP_DIR:
+        args.append(f"--temp-directory={TEMP_DIR}")
 
     log(f"Launching ComfyUI with args: {' '.join(args)}")
     log(f"ComfyUI output will be logged to: {comfyui_log_file}")
@@ -115,6 +150,9 @@ def main():
 
     # Clean up old logs
     clean_old_logs()
+
+    # Create extra_model_paths.yaml if needed
+    create_extra_model_paths_yaml()
 
     # Ensure any existing ComfyUI instances are terminated before starting a new one
     terminate_existing_comfyui()
