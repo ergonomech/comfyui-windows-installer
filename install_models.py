@@ -9,7 +9,7 @@ from tqdm import tqdm
 import stat
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Determine the paths from the environment variables or set default values
 COMFYUI_DIR = os.getenv("COMFYUI_DIR", os.path.join(os.getenv("USERPROFILE"), "ComfyUI"))
