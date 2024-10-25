@@ -10,8 +10,9 @@ IF NOT EXIST "%CONDA_PATH%" (
 set "PATH=%CONDA_PATH%\Scripts;%CONDA_PATH%\Library\bin;%CONDA_PATH%\condabin;%PATH%"
 :: Activate the Conda environment directly using activate.bat
 echo Activating the Conda environment...
-cmd.exe /c call "%CONDA_PATH%\Scripts\activate.bat" ComfyUI
+call conda activate ComfyUI
 :: Run the model installation script
 echo Running Python script...
-cmd.exe /c python install_models.py
+call pip install python-dotenv
+call python install_models.py
 pause
