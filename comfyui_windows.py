@@ -35,10 +35,11 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 # Set environment variables for PyTorch, CUDA, etc.
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["CUDA_AUTO_BOOST"] = "0"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "garbage_collection_threshold:0.9,max_split_size_mb:512"
+os.environ["CUDA_AUTO_BOOST"] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "backend:cudaMallocAsync,expandable_segments:True"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
 os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "0"
-os.environ["TORCH_USE_CUDA_DSA"] = "0"
+os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "20"
 
 def setup_logger(log_type="script"):
     """Set up logging to a daily file for script runner or ComfyUI logs."""
