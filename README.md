@@ -46,6 +46,40 @@ Before running the installer, ensure that your system meets the following requir
 
    - This will set up a new Conda environment with the required dependencies, clone ComfyUI and plugins, and configure paths.
 
+## Model Installation
+
+After installing ComfyUI, use the `install_models.bat` script to install or update models. The script uses configurations to specify model types (unet, vae, clip) and Hugging Face repositories.
+
+### How to configure models:
+
+- Models are organized under folders like `unet`, `vae`, and `clip`.
+- In the `.env` file or config file, specify the repositories and any filtering needed for files or folders.
+
+For example:
+
+```bash
+[unet]
+repo=https://huggingface.co/mikeyandfriends/PixelWave_FLUX.1-schnell_01
+
+[vae]
+repo=https://huggingface.co/black-forest-labs/FLUX.1-schnell
+include_folder=vae
+
+[clip]
+repo=https://huggingface.co/comfyanonymous/flux_text_encoders
+exclude_file=t5xxl_fp16.safetensors
+```
+
+The script supports sparse checkouts to include/exclude specific files or directories for efficient cloning.
+
+### Cloning with Git LFS:
+
+The model installer uses Git LFS for handling large files. If the model repository uses LFS, the installer automatically initializes Git LFS and pulls the required files.
+
+## Sample Workflow JSONs
+
+Two sample workflow JSON files are included in this repository, which can be loaded directly into ComfyUI to demonstrate example use cases and configurations.
+
 ## Launching ComfyUI
 
 1. **Run the Launcher**:
@@ -139,7 +173,6 @@ To run ComfyUI as a service using `nssm.exe`, follow these steps:
   - [ComfyUI-Manager](https://github.com/ltdrdata/ComfyUI-Manager)
   - [rgthree-comfy](https://github.com/rgthree/rgthree-comfy)
   - [comfyui-reactor-node](https://github.com/Gourieff/comfyui-reactor-node)
-  - [was-node-suite-comfyui](https://github.com/WASasquatch/was-node-suite-comfyui)
   - [ComfyUI-Inspire-Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack)
   - [ComfyUI-UX-Nodes](https://github.com/Anibaaal/ComfyUI-UX-Nodes)
   - [ComfyUI Extra Models](https://github.com/city96/ComfyUI_ExtraModels)

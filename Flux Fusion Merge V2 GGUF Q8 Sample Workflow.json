@@ -1,0 +1,994 @@
+{
+  "last_node_id": 22,
+  "last_link_id": 44,
+  "nodes": [
+    {
+      "id": 4,
+      "type": "VAELoader",
+      "pos": {
+        "0": 721,
+        "1": 1180
+      },
+      "size": {
+        "0": 315,
+        "1": 58
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            41,
+            44
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "FLUX.1-schnell\\vae\\diffusion_pytorch_model.safetensors"
+      ]
+    },
+    {
+      "id": 19,
+      "type": "workflow>Flux Sampling Group Node",
+      "pos": {
+        "0": 1189,
+        "1": 957
+      },
+      "size": {
+        "0": 521.121826171875,
+        "1": 826.5472412109375
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 42
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 40
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            43
+          ]
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "workflow>Flux Sampling Group Node"
+      },
+      "widgets_values": [
+        272616830709028,
+        "randomize",
+        "euler",
+        "Flux-Fusion-V2\\GGUF\\FluxFusionV2-Q8_0.gguf",
+        0,
+        0,
+        1080,
+        1984,
+        "beta",
+        4,
+        1
+      ]
+    },
+    {
+      "id": 20,
+      "type": "workflow>Flux Encode Aspect Ratio Group Node",
+      "pos": {
+        "0": 666,
+        "1": 940
+      },
+      "size": {
+        "0": 441,
+        "1": 178
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 41
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "workflow>Flux Encode Aspect Ratio Group Node"
+      },
+      "widgets_values": [
+        9,
+        16,
+        1,
+        0,
+        "nearest-exact",
+        1
+      ]
+    },
+    {
+      "id": 21,
+      "type": "workflow>Flux Clip Text Encode Group Node",
+      "pos": {
+        "0": 635,
+        "1": 1297
+      },
+      "size": {
+        "0": 506.8374938964844,
+        "1": 518.9612426757812
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "workflow>Flux Clip Text Encode Group Node"
+      },
+      "widgets_values": [
+        "flux_text_encoders\\clip_l.safetensors",
+        "flux_text_encoders\\t5xxl_fp8_e4m3fn_scaled.safetensors",
+        "flux",
+        "Title: \"Demonic Elegance: A Study in Contrast\"\n\n**Description:**\nIn this provocative meme art piece, we are met with a striking contrast of light and darkness, elegance and menace. The subject, a demonically endowed individual, stands tall, exuding an air of confidence and an undeniable sense of power. Their demonic features, including the large curved horns and glowing red eyes, are accentuated by the dramatic lighting, casting an eerie shadow across their face, enhancing the menacing gaze. \n\nDespite the dark visage, the character's attire exudes an air of sophistication. They wear a well-tailored dark suit, the fabric seemingly absorbing the light, adding to the mysterious aura. The white dress shirt provides a stark contrast, highlighting the demon's hands, which are gracefully positioned, emphasizing their long, elegant fingers. The purple tie, a bold choice, adds a pop of color, echoing the cosmic hues of the background. \n\nThe background, a vibrant explosion of pink and purple, is a stark contrast to the foreground. It represents the vastness of space, with its cosmic swirls and twinkles, adding a sense of otherworldliness to the scene. The two ornate brooches on the suit's lapels, shaped like stars, seem to connect the character to this cosmic realm, almost as if they are a part of this celestial dance. \n\nThis image, with its bold composition and unapologetic portrayal of a demonically expressive individual, challenges societal norms and expectations, much like the work of Helmut Newton. It invites the viewer to question the beauty in the unconventional and the power that lies within diverse expressions of gender and body types. \n\n**Meme Art Style and Helmut Newton's Influence:**\nHelmut Newton's iconic style, with its dramatic lighting and unadulterated portrayal of the human form, is evident in this piece. The use of lighting to create a sense of drama and the emphasis on the human (or in this case, demonic) form align perfectly with Newton's aesthetic. The bold contrast between light and dark, a signature element in Newton's work, is masterfully employed here, creating a visually striking and thought-provoking image. \n\nFurthermore, Newton's fearless exploration of sexuality and power dynamics is echoed in this scene. The demon's confident stance and intense gaze challenge traditional notions of beauty and power, much like Newton's iconic images of strong, unapologetic women. This piece, with its uncensored and unfiltered portrayal, aligns perfectly with the provocative and challenging nature of \"Meme Art,\" making Helmut Newton an ideal artistic influence for this scene.",
+        3.5
+      ]
+    },
+    {
+      "id": 22,
+      "type": "workflow>Flux Decode Group Node",
+      "pos": {
+        "0": 1743,
+        "1": 953
+      },
+      "size": {
+        "0": 477.33807373046875,
+        "1": 826.6073608398438
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 43
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 44
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "workflow>Flux Decode Group Node"
+      },
+      "widgets_values": [
+        "ComfyUI"
+      ]
+    }
+  ],
+  "links": [
+    [
+      40,
+      20,
+      0,
+      19,
+      1,
+      "LATENT"
+    ],
+    [
+      41,
+      4,
+      0,
+      20,
+      0,
+      "VAE"
+    ],
+    [
+      42,
+      21,
+      0,
+      19,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      43,
+      19,
+      0,
+      22,
+      0,
+      "LATENT"
+    ],
+    [
+      44,
+      4,
+      0,
+      22,
+      1,
+      "VAE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9229599817706473,
+      "offset": [
+        -159.89817344769367,
+        -759.800214230101
+      ]
+    },
+    "groupNodes": {
+      "Flux Sampling Group Node": {
+        "nodes": [
+          {
+            "id": -1,
+            "type": "RandomNoise",
+            "pos": {
+              "0": 1120,
+              "1": 1148
+            },
+            "size": {
+              "0": 315,
+              "1": 82
+            },
+            "flags": {},
+            "order": 3,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "NOISE",
+                "type": "NOISE",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "RandomNoise"
+            },
+            "widgets_values": [
+              622411873602075,
+              "randomize"
+            ],
+            "index": 0
+          },
+          {
+            "id": -1,
+            "type": "KSamplerSelect",
+            "pos": {
+              "0": 2166,
+              "1": 1690
+            },
+            "size": {
+              "0": 315,
+              "1": 58
+            },
+            "flags": {},
+            "order": 4,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "SAMPLER",
+                "type": "SAMPLER",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "KSamplerSelect"
+            },
+            "widgets_values": [
+              "euler"
+            ],
+            "index": 1
+          },
+          {
+            "id": -1,
+            "type": "UnetLoaderGGUF",
+            "pos": {
+              "0": 1443,
+              "1": 1425
+            },
+            "size": {
+              "0": 315,
+              "1": 58
+            },
+            "flags": {},
+            "order": 5,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "MODEL",
+                "type": "MODEL",
+                "links": [],
+                "slot_index": 0
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "UnetLoaderGGUF"
+            },
+            "widgets_values": [
+              "PixelWave_FLUX.1-schnell_01\\pixelwave_flux1_schnell_Q4_K_M_01.gguf"
+            ],
+            "index": 2
+          },
+          {
+            "id": -1,
+            "type": "ModelSamplingFlux",
+            "pos": {
+              "0": 2042.9998779296875,
+              "1": 1944
+            },
+            "size": {
+              "0": 315,
+              "1": 130
+            },
+            "flags": {},
+            "order": 8,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "model",
+                "type": "MODEL",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "MODEL",
+                "type": "MODEL",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "ModelSamplingFlux"
+            },
+            "widgets_values": [
+              1.15,
+              0.5,
+              1024,
+              1024
+            ],
+            "index": 3
+          },
+          {
+            "id": -1,
+            "type": "BasicScheduler",
+            "pos": {
+              "0": 2335,
+              "1": 1864
+            },
+            "size": {
+              "0": 315,
+              "1": 106
+            },
+            "flags": {},
+            "order": 11,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "model",
+                "type": "MODEL",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "SIGMAS",
+                "type": "SIGMAS",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "BasicScheduler"
+            },
+            "widgets_values": [
+              "simple",
+              8,
+              1
+            ],
+            "index": 4
+          },
+          {
+            "id": -1,
+            "type": "BasicGuider",
+            "pos": {
+              "0": 2384,
+              "1": 1459
+            },
+            "size": {
+              "0": 241.79998779296875,
+              "1": 46
+            },
+            "flags": {},
+            "order": 12,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "model",
+                "type": "MODEL",
+                "link": null
+              },
+              {
+                "name": "conditioning",
+                "type": "CONDITIONING",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "GUIDER",
+                "type": "GUIDER",
+                "links": [],
+                "slot_index": 0
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "BasicGuider"
+            },
+            "index": 5
+          },
+          {
+            "id": -1,
+            "type": "SamplerCustomAdvanced",
+            "pos": {
+              "0": 2722,
+              "1": 1551
+            },
+            "size": {
+              "0": 355.20001220703125,
+              "1": 326
+            },
+            "flags": {},
+            "order": 13,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "noise",
+                "type": "NOISE",
+                "link": null
+              },
+              {
+                "name": "guider",
+                "type": "GUIDER",
+                "link": null
+              },
+              {
+                "name": "sampler",
+                "type": "SAMPLER",
+                "link": null
+              },
+              {
+                "name": "sigmas",
+                "type": "SIGMAS",
+                "link": null
+              },
+              {
+                "name": "latent_image",
+                "type": "LATENT",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "output",
+                "type": "LATENT",
+                "links": [],
+                "slot_index": 0
+              },
+              {
+                "name": "denoised_output",
+                "type": "LATENT",
+                "links": null
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "SamplerCustomAdvanced"
+            },
+            "index": 6
+          }
+        ],
+        "links": [
+          [
+            2,
+            0,
+            3,
+            0,
+            1,
+            "MODEL"
+          ],
+          [
+            3,
+            0,
+            4,
+            0,
+            17,
+            "MODEL"
+          ],
+          [
+            2,
+            0,
+            5,
+            0,
+            1,
+            "MODEL"
+          ],
+          [
+            null,
+            0,
+            5,
+            1,
+            7,
+            "CONDITIONING"
+          ],
+          [
+            0,
+            0,
+            6,
+            0,
+            10,
+            "NOISE"
+          ],
+          [
+            5,
+            0,
+            6,
+            1,
+            5,
+            "GUIDER"
+          ],
+          [
+            1,
+            0,
+            6,
+            2,
+            11,
+            "SAMPLER"
+          ],
+          [
+            4,
+            0,
+            6,
+            3,
+            12,
+            "SIGMAS"
+          ],
+          [
+            null,
+            0,
+            6,
+            4,
+            3,
+            "LATENT"
+          ]
+        ],
+        "external": [
+          [
+            6,
+            0,
+            "LATENT"
+          ]
+        ]
+      },
+      "Flux Encode Aspect Ratio Group Node": {
+        "nodes": [
+          {
+            "id": -1,
+            "type": "EmptyImage",
+            "pos": {
+              "0": 222,
+              "1": 816
+            },
+            "size": {
+              "0": 315,
+              "1": 130
+            },
+            "flags": {},
+            "order": 2,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "IMAGE",
+                "type": "IMAGE",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "EmptyImage"
+            },
+            "widgets_values": [
+              9,
+              16,
+              1,
+              0
+            ],
+            "index": 0
+          },
+          {
+            "id": -1,
+            "type": "ImageScaleToTotalPixels",
+            "pos": {
+              "0": 594,
+              "1": 818
+            },
+            "size": {
+              "0": 315,
+              "1": 82
+            },
+            "flags": {},
+            "order": 4,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "image",
+                "type": "IMAGE",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "IMAGE",
+                "type": "IMAGE",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "ImageScaleToTotalPixels"
+            },
+            "widgets_values": [
+              "nearest-exact",
+              1
+            ],
+            "index": 1
+          },
+          {
+            "id": -1,
+            "type": "VAEEncode",
+            "pos": {
+              "0": 991,
+              "1": 921
+            },
+            "size": {
+              "0": 210,
+              "1": 46
+            },
+            "flags": {},
+            "order": 6,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "pixels",
+                "type": "IMAGE",
+                "link": null
+              },
+              {
+                "name": "vae",
+                "type": "VAE",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "LATENT",
+                "type": "LATENT",
+                "links": [],
+                "slot_index": 0
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "VAEEncode"
+            },
+            "index": 2
+          }
+        ],
+        "links": [
+          [
+            0,
+            0,
+            1,
+            0,
+            15,
+            "IMAGE"
+          ],
+          [
+            1,
+            0,
+            2,
+            0,
+            14,
+            "IMAGE"
+          ],
+          [
+            null,
+            0,
+            2,
+            1,
+            4,
+            "VAE"
+          ]
+        ],
+        "external": [
+          [
+            2,
+            0,
+            "LATENT"
+          ]
+        ]
+      },
+      "Flux Clip Text Encode Group Node": {
+        "nodes": [
+          {
+            "id": -1,
+            "type": "DualCLIPLoader",
+            "pos": {
+              "0": -33,
+              "1": 1633
+            },
+            "size": {
+              "0": 315,
+              "1": 106
+            },
+            "flags": {},
+            "order": 1,
+            "mode": 0,
+            "inputs": [],
+            "outputs": [
+              {
+                "name": "CLIP",
+                "type": "CLIP",
+                "links": []
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "DualCLIPLoader"
+            },
+            "widgets_values": [
+              "flux_text_encoders\\clip_l.safetensors",
+              "flux_text_encoders\\t5xxl_fp8_e4m3fn_scaled.safetensors",
+              "flux"
+            ],
+            "index": 0
+          },
+          {
+            "id": -1,
+            "type": "CLIPTextEncode",
+            "pos": {
+              "0": 368,
+              "1": 1675
+            },
+            "size": {
+              "0": 400,
+              "1": 200
+            },
+            "flags": {},
+            "order": 3,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "clip",
+                "type": "CLIP",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "CONDITIONING",
+                "type": "CONDITIONING",
+                "links": [],
+                "slot_index": 0
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "CLIPTextEncode"
+            },
+            "widgets_values": [
+              ""
+            ],
+            "index": 1
+          },
+          {
+            "id": -1,
+            "type": "FluxGuidance",
+            "pos": {
+              "0": 663,
+              "1": 1414
+            },
+            "size": {
+              "0": 317.4000244140625,
+              "1": 58
+            },
+            "flags": {},
+            "order": 4,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "conditioning",
+                "type": "CONDITIONING",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "CONDITIONING",
+                "type": "CONDITIONING",
+                "links": [],
+                "slot_index": 0
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "FluxGuidance"
+            },
+            "widgets_values": [
+              3.5
+            ],
+            "index": 2
+          }
+        ],
+        "links": [
+          [
+            0,
+            0,
+            1,
+            0,
+            8,
+            "CLIP"
+          ],
+          [
+            1,
+            0,
+            2,
+            0,
+            6,
+            "CONDITIONING"
+          ]
+        ],
+        "external": [
+          [
+            2,
+            0,
+            "CONDITIONING"
+          ]
+        ]
+      },
+      "Flux Decode Group Node": {
+        "nodes": [
+          {
+            "id": -1,
+            "type": "VAEDecode",
+            "pos": {
+              "0": 2014,
+              "1": 1373
+            },
+            "size": {
+              "0": 210,
+              "1": 46
+            },
+            "flags": {},
+            "order": 4,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "samples",
+                "type": "LATENT",
+                "link": null
+              },
+              {
+                "name": "vae",
+                "type": "VAE",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "IMAGE",
+                "type": "IMAGE",
+                "links": [],
+                "slot_index": 0
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "VAEDecode"
+            },
+            "index": 0
+          },
+          {
+            "id": -1,
+            "type": "SaveImage",
+            "pos": {
+              "0": 2299,
+              "1": 1395
+            },
+            "size": {
+              "0": 315,
+              "1": 270
+            },
+            "flags": {},
+            "order": 5,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "images",
+                "type": "IMAGE",
+                "link": null
+              }
+            ],
+            "outputs": [],
+            "properties": {},
+            "widgets_values": [
+              "ComfyUI"
+            ],
+            "index": 1
+          }
+        ],
+        "links": [
+          [
+            null,
+            0,
+            0,
+            0,
+            19,
+            "LATENT"
+          ],
+          [
+            null,
+            0,
+            0,
+            1,
+            4,
+            "VAE"
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            2,
+            "IMAGE"
+          ]
+        ],
+        "external": []
+      }
+    }
+  },
+  "version": 0.4
+}

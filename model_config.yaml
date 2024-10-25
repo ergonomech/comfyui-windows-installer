@@ -1,0 +1,19 @@
+unet:
+  PixelWave_FLUX.1-schnell_01:
+    repo_url: https://huggingface.co/mikeyandfriends/PixelWave_FLUX.1-schnell_01
+  Flux-Fusion-V2:
+    repo_url: https://huggingface.co/Anibaaal/Flux-Fusion-V2-4step-merge-gguf-nf4
+    include_files:
+      - GGUF/FluxFusionV2-Q4_K_M.gguf
+      - GGUF/FluxFusionV2-Q8_0.gguf
+
+vae:
+  FLUX.1-schnell:
+    repo_url: https://huggingface.co/black-forest-labs/FLUX.1-schnell
+    include_folder: vae
+
+clip:
+  flux_text_encoders:
+    repo_url: https://huggingface.co/comfyanonymous/flux_text_encoders
+    exclude_files:
+      - t5xxl_fp16.safetensors

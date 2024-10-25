@@ -1,68 +1,56 @@
 @echo off
-
-:: ===========================
-:: Configurable Variables
-:: ===========================
+:: Detect the user's home directory
 set "USER_HOME=%USERPROFILE%"
-set "COMFYUI_DIR=%USER_HOME%\ComfyUI"
-set "PLUGINS_DIR=%COMFYUI_DIR%\custom_nodes"
-set "CONDA_ENV_NAME=ComfyUI"
+
+:: Define the Conda path and environment name
 set "CONDA_PATH=%USER_HOME%\miniconda3"
-
-:: ===========================
-:: Script Execution
-:: ===========================
-
-:: Log script start
-echo Starting ComfyUI update...
-echo ComfyUI directory: %COMFYUI_DIR%
-echo Plugins directory: %PLUGINS_DIR%
-
-:: Check for existing Conda installation
 IF NOT EXIST "%CONDA_PATH%" (
     set "CONDA_PATH=%USER_HOME%\anaconda3"
 )
+set "COMFYUI_ENV_NAME=ComfyUI"
+
+:: Define the ComfyUI directory
+set COMFYUI_DIR=%USER_HOME%\ComfyUI
 
 :: Temporarily add Conda to the PATH for the current session
 set "PATH=%CONDA_PATH%\Scripts;%CONDA_PATH%\Library\bin;%CONDA_PATH%\condabin;%PATH%"
 
-:: Activate the Conda environment
+:: Activate the Conda environment directly using activate.bat
 echo Activating the Conda environment...
-call "%CONDA_PATH%\Scripts\activate.bat" %CONDA_ENV_NAME%
+call "%CONDA_PATH%\Scripts\activate.bat" %COMFYUI_ENV_NAME%
 
-:: Change to the ComfyUI working directory
+:: Change to the ComfyUI directory
 echo Changing to the ComfyUI directory...
-cd /d "%COMFYUI_DIR%"
+cd %COMFYUI_DIR%
 
-:: Pull the latest changes for ComfyUI
-echo Updating ComfyUI...
-git pull origin main
+:: Pull the latest changes for the base ComfyUI repository
+echo Pulling updates for ComfyUI...
+git pull
 
-:: Reinstall base requirements
-if exist requirements.txt (
-    echo Installing base requirements...
-    pip install -r requirements.txt
+:: Reinstall the base requirements for ComfyUI
+IF EXIST requirements.txt (
+    echo Reinstalling requirements for ComfyUI...
+    pip install --no-cache-dir -r requirements.txt
 )
 
-:: Update all plugins
-echo Updating plugins...
-for /D %%p in ("%PLUGINS_DIR%\*") do (
-    echo Updating plugin in directory %%p...
-    cd /d "%%p"
-    git pull origin main
-    if exist requirements.txt (
-        echo Installing plugin requirements for %%p...
-        pip install -r requirements.txt
+:: Update each plugin in the custom_nodes directory
+echo Updating custom nodes...
+cd custom_nodes
+
+for /D %%d in (*) do (
+    echo Updating %%d...
+    cd %%d
+    git pull
+
+    :: Reinstall requirements if present
+    IF EXIST requirements.txt (
+        echo Reinstalling requirements for %%d...
+        pip install --no-cache-dir -r requirements.txt
     )
+
+    cd ..
 )
 
-:: Change back to the ComfyUI directory
-cd /d "%COMFYUI_DIR%"
-
-:: Deactivate the Conda environment
-echo Deactivating the Conda environment...
-call "%CONDA_PATH%\Scripts\deactivate.bat"
-
-:: Log update completion
-echo Update completed successfully!
+:: Final message
+echo Update complete. All repositories have been pulled and dependencies reinstalled.
 pause
