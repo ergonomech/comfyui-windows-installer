@@ -1,44 +1,42 @@
 @echo off
-:: Detect the user's home directory
 set "USER_HOME=%USERPROFILE%"
-:: Define the Conda path and environment name
 set "CONDA_PATH=%USER_HOME%\miniconda3"
 IF NOT EXIST "%CONDA_PATH%" (
     set "CONDA_PATH=%USER_HOME%\anaconda3"
 )
-set "COMFYUI_ENV_NAME=ComfyUI"
-:: Define the ComfyUI directory
-set COMFYUI_DIR=%USER_HOME%\ComfyUI
-:: Temporarily add Conda to the PATH for the current session
-set "PATH=%CONDA_PATH%\Scripts;%CONDA_PATH%\Library\bin;%CONDA_PATH%\condabin;%PATH%"
-:: Activate the Conda environment directly using activate.bat
-echo Activating the Conda environment...
-call "%CONDA_PATH%\Scripts\activate.bat" %COMFYUI_ENV_NAME%
-:: Change to the ComfyUI directory
-echo Changing to the ComfyUI directory...
-cd %COMFYUI_DIR%
-:: Pull the latest changes for the base ComfyUI repository
-echo Pulling updates for ComfyUI...
-cmd.exe /c git pull
-:: Reinstall the base requirements for ComfyUI
-IF EXIST requirements.txt (
-    echo Reinstalling requirements for ComfyUI...
-    cmd.exe /c pip install --no-cache-dir -r requirements.txt
+IF NOT EXIST "%CONDA_PATH%" (
+    set "CONDA_PATH=C:\ProgramData\miniconda3"
 )
-:: Update each plugin in the custom_nodes directory
-echo Updating custom nodes...
-cd custom_nodes
+IF NOT EXIST "%CONDA_PATH%" (
+    set "CONDA_PATH=C:\ProgramData\anaconda3"
+)
+set COMFYUI_DIR=%USER_HOME%\ComfyUI
+call conda activate ComfyUI
+cd %COMFYUI_DIR%
+echo Updating ComfyUI base repository...
+git pull
+IF EXIST requirements.txt (
+    echo Updating ComfyUI base requirements...
+    call python -m pip install --no-cache-dir -r requirements.txt
+)
+cd %COMFYUI_DIR%\custom_nodes
 for /D %%d in (*) do (
-    echo Updating %%d...
+    echo Updating %%d repository...
     cd %%d
-    cmd.exe /c git pull
-    :: Reinstall requirements if present
+    git pull
     IF EXIST requirements.txt (
-        echo Reinstalling requirements for %%d...
-        cmd.exe /c pip install --no-cache-dir -r requirements.txt
+        echo Installing requirements for %%d...
+        call python -m pip install --no-cache-dir -r requirements.txt
+    )
+    IF EXIST install.py (
+        echo Running install.py for %%d...
+        call python install.py
+    )
+    IF EXIST install.bat (
+        echo Running install.bat for %%d...
+        call install.bat
     )
     cd ..
 )
-:: Final message
-echo Update complete. All repositories have been pulled and dependencies reinstalled.
+echo Update complete.
 pause

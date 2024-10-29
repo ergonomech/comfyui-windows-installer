@@ -22,7 +22,7 @@ Before running the installer, ensure that your system meets the following requir
    After installing Miniconda, ensure you run the following command in your terminal or Command Prompt to initialize Conda for your shell:
    
    ```bash
-   conda init
+   conda init --all --system
    ```
 
 4. **Git**
