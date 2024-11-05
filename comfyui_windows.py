@@ -1,82 +1,102 @@
 import os
+import sys
 import time
+import uuid
 import subprocess
 import requests
 import logging
-from datetime import datetime, timedelta
+import logging.handlers
 import psutil
+from pathlib import Path
+from datetime import datetime, timedelta
+from typing import Optional
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv(override=True)
+class ComfyUILogger:
+    """Handles logging with date, UUID, and PID in filename."""
+    
+    def __init__(self):
+        # Get script directory for logs
+        self.script_dir = Path(__file__).parent.resolve()
+        self.log_dir = self.script_dir / "logs"
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate unique identifiers
+        self.session_id = str(uuid.uuid4())[:8]
+        self.pid = os.getpid()
+        
+        # Create log filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_filename = f"comfyui_{timestamp}_{self.session_id}_{self.pid}.log"
+        self.log_file = self.log_dir / log_filename
+        
+        # Configure logger
+        self.logger = logging.getLogger("ComfyUIManager")
+        self.logger.setLevel(logging.INFO)
+        
+        # Remove any existing handlers
+        self.logger.handlers = []
+        
+        # Create file handler
+        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
+        file_handler.setLevel(logging.INFO)
+        
+        # Create formatter
+        formatter = logging.Formatter(
+            '%(asctime)s | %(levelname)s | %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        file_handler.setFormatter(formatter)
+        
+        # Add handler to logger
+        self.logger.addHandler(file_handler)
+        
+        # Log initial message
+        self.logger.info(f"=== Starting new ComfyUI session ===")
+        self.logger.info(f"Session ID: {self.session_id}")
+        self.logger.info(f"PID: {self.pid}")
+        self.logger.info(f"Log file: {self.log_file}")
 
-# Get default paths based on user profile
-USER_HOME = os.getenv("USERPROFILE")
-DEFAULT_CONDA_PATH = os.path.join(USER_HOME, "miniconda3")
-DEFAULT_COMFYUI_DIR = os.path.join(USER_HOME, "ComfyUI")
-DEFAULT_LOG_DIR = os.path.join(DEFAULT_COMFYUI_DIR, "logs")
+    def clean_old_logs(self, days: int = 7):
+        try:
+            cutoff = datetime.now() - timedelta(days=days)
+            for log_file in self.log_dir.glob("comfyui_*.log"):
+                file_time = datetime.fromtimestamp(log_file.stat().st_mtime)
+                if file_time < cutoff:
+                    try:
+                        log_file.unlink()
+                        self.logger.info(f"Removed old log file: {log_file.name}")
+                    except OSError as e:
+                        self.logger.error(f"Failed to remove old log {log_file.name}: {e}")
+        except Exception as e:
+            self.logger.error(f"Error cleaning old logs: {e}")
 
-# Read environment variables with fallbacks to defaults
-CONDA_PATH = os.getenv("CONDA_PATH", DEFAULT_CONDA_PATH)
-COMFYUI_ENV_NAME = os.getenv("COMFYUI_ENV_NAME", "ComfyUI")
-COMFYUI_DIR = os.getenv("COMFYUI_DIR", DEFAULT_COMFYUI_DIR)
-MODEL_BASE_PATH = os.getenv("MODEL_BASE_PATH")
-INPUT_DIR = os.getenv("INPUT_DIR")
-OUTPUT_DIR = os.getenv("OUTPUT_DIR")
-TEMP_DIR = os.getenv("TEMP_DIR")
-SERVER_PORT = os.getenv("SERVER_PORT", "8188")
-CUSTOM_PARAMETERS = os.getenv("CUSTOM_PARAMETERS", "")
-MONITOR_INTERVAL = int(os.getenv("MONITOR_INTERVAL", 10))
-BOOT_WAIT_TIME = int(os.getenv("BOOT_WAIT_TIME", 30))
-LOG_DIR = os.getenv("LOG_DIR", DEFAULT_LOG_DIR)
-
-# Create log directory if it doesn't exist
-os.makedirs(LOG_DIR, exist_ok=True)
-
-# Set environment variables for PyTorch, CUDA, etc.
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
-os.environ["CUDA_AUTO_BOOST"] = "1"
-os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "backend:cudaMallocAsync,expandable_segments:True"
-os.environ["TORCH_USE_CUDA_DSA"] = "1"
-os.environ["PYTORCH_NO_CUDA_MEMORY_CACHING"] = "0"
-os.environ["CUDA_DEVICE_MAX_CONNECTIONS"] = "20" 
-
-def setup_logger(log_type="script"):
-    """Set up logging to a daily file for script runner or ComfyUI logs."""
-    log_filename = os.path.join(LOG_DIR, f"{log_type}_log_{datetime.now().strftime('%Y-%m-%d')}.log")
-    logging.basicConfig(
-        filename=log_filename,
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-    )
-    return log_filename
-
-def log(message):
-    """Log messages to the file and print minimal status to the console."""
-    logging.info(message)
-    print(message)
-
-def clean_old_logs():
-    """Remove log files older than two days."""
-    cutoff_date = datetime.now() - timedelta(days=2)
-    for log_file in os.listdir(LOG_DIR):
-        log_path = os.path.join(LOG_DIR, log_file)
-        if os.path.isfile(log_path):
-            file_date_str = log_file.split('_')[-1].replace(".log", "")
-            try:
-                file_date = datetime.strptime(file_date_str, "%Y-%m-%d")
-                if file_date < cutoff_date:
-                    os.remove(log_path)
-                    log(f"Removed old log file: {log_file}")
-            except ValueError:
-                pass  # Ignore files that don't match the date pattern
-
-def create_extra_model_paths_yaml():
-    """Create or update the extra_model_paths.yaml if MODEL_BASE_PATH is provided."""
-    if MODEL_BASE_PATH:
-        yaml_content = f"""
+class ComfyUILauncher:
+    def __init__(self):
+        # Initialize logger first
+        self.logger = ComfyUILogger()
+        
+        # Load environment variables
+        load_dotenv()
+        
+        # Set up paths
+        self.user_home = Path(os.environ["USERPROFILE"])
+        self.comfyui_dir = Path(os.getenv("COMFYUI_DIR", self.user_home / "ComfyUI"))
+        self.model_base_path = os.getenv("MODEL_BASE_PATH")
+        self.input_dir = os.getenv("INPUT_DIR")
+        self.output_dir = os.getenv("OUTPUT_DIR")
+        self.temp_dir = os.getenv("TEMP_DIR")
+        self.server_port = os.getenv("SERVER_PORT", "8188")
+        self.custom_parameters = os.getenv("CUSTOM_PARAMETERS", "").split()
+        self.monitor_interval = int(os.getenv("MONITOR_INTERVAL", "10"))
+        self.boot_wait_time = int(os.getenv("BOOT_WAIT_TIME", "30"))
+    
+    def _create_model_paths_yaml(self) -> None:
+        """Create the extra_model_paths.yaml file if MODEL_BASE_PATH is set."""
+        if self.model_base_path:
+            yaml_content = f"""
 comfyui:
-  base_path: {MODEL_BASE_PATH}
+  base_path: {self.model_base_path}
   is_default: true
   checkpoints: checkpoints
   clip: clip
@@ -88,99 +108,146 @@ comfyui:
     unet
   embeddings: embeddings
   loras: loras
+  text_encoders: text_encoders
   upscale_models: upscale_models
   vae: vae
+  reactor: reactor
 """
-        # Ensure the ComfyUI directory exists
-        os.makedirs(COMFYUI_DIR, exist_ok=True)
-
-        yaml_path = os.path.join(COMFYUI_DIR, "extra_model_paths.yaml")
-        with open(yaml_path, "w") as yaml_file:
-            yaml_file.write(yaml_content)
-        log(f"Created or updated {yaml_path}")
-
-def terminate_existing_comfyui():
-    """Terminate any running instance of ComfyUI using the specified port."""
-    for process in psutil.process_iter(['pid', 'name', 'cmdline']):
+            yaml_path = self.comfyui_dir / "extra_model_paths.yaml"
+            yaml_path.write_text(yaml_content)
+            self.logger.logger.info(f"Created model paths configuration at {yaml_path}")
+    
+    def _launch_comfyui(self) -> Optional[subprocess.Popen]:
+        """Launch ComfyUI process with output redirection."""
         try:
-            if 'python' in process.name().lower() and 'main.py' in ' '.join(process.cmdline()):
-                log(f"Found existing ComfyUI process (PID: {process.pid}). Terminating it...")
+            args = ["python", str(self.comfyui_dir / "main.py"), f"--port={self.server_port}"]
+            args.extend(self.custom_parameters)
+            
+            if self.input_dir:
+                args.append(f"--input-directory={self.input_dir}")
+            if self.output_dir:
+                args.append(f"--output-directory={self.output_dir}")
+            if self.temp_dir:
+                args.append(f"--temp-directory={self.temp_dir}")
+            
+            # Set up environment
+            env = os.environ.copy()
+            env.update({
+                "KMP_DUPLICATE_LIB_OK": "TRUE",
+                "PYTORCH_CUDA_ALLOC_CONF": "backend:cudaMallocAsync,expandable_segments:True",
+                "CUDA_DEVICE_MAX_CONNECTIONS": "20",
+                "PYTHONUNBUFFERED": "1"
+            })
+            
+            self.logger.logger.info(f"Launching ComfyUI with arguments: {' '.join(args)}")
+            
+            def output_reader(pipe, log_func):
+                try:
+                    with pipe:
+                        for line in iter(pipe.readline, ''):
+                            log_func(line.strip())
+                except Exception as e:
+                    self.logger.logger.error(f"Error reading output: {e}")
+            
+            process = subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+                env=env,
+                cwd=str(self.comfyui_dir)
+            )
+            
+            import threading
+            threading.Thread(
+                target=output_reader,
+                args=(process.stdout, self.logger.logger.info),
+                daemon=True
+            ).start()
+            threading.Thread(
+                target=output_reader,
+                args=(process.stderr, self.logger.logger.error),
+                daemon=True
+            ).start()
+            
+            return process
+            
+        except Exception as e:
+            self.logger.logger.error(f"Failed to launch ComfyUI: {e}")
+            return None
+    
+    def _is_server_responding(self) -> bool:
+        """Check if the ComfyUI server is responding."""
+        try:
+            response = requests.get(f"http://127.0.0.1:{self.server_port}", timeout=5)
+            return response.status_code == 200
+        except requests.RequestException:
+            return False
+    
+    def run(self):
+        """Run ComfyUI with monitoring and auto-restart."""
+        try:
+            # Create model paths yaml if needed
+            self._create_model_paths_yaml()
+            
+            while True:
+                process = self._launch_comfyui()
+                if not process:
+                    self.logger.logger.error("Failed to start ComfyUI. Retrying in 10 seconds...")
+                    time.sleep(10)
+                    continue
+                
+                # Wait for server startup
+                start_time = time.time()
+                server_ready = False
+                
+                while time.time() - start_time < self.boot_wait_time:
+                    if self._is_server_responding():
+                        server_ready = True
+                        self.logger.logger.info("ComfyUI server is ready")
+                        break
+                    time.sleep(1)
+                
+                if not server_ready:
+                    self.logger.logger.error("Server failed to start within timeout")
+                    process.terminate()
+                    continue
+                
+                # Monitor loop
+                try:
+                    while True:
+                        if process.poll() is not None:
+                            self.logger.logger.error("ComfyUI process has terminated unexpectedly")
+                            break
+                        
+                        if not self._is_server_responding():
+                            self.logger.logger.error("Server not responding")
+                            process.terminate()
+                            break
+                        
+                        # Clean old logs periodically
+                        self.logger.clean_old_logs()
+                        
+                        time.sleep(self.monitor_interval)
+                        
+                except KeyboardInterrupt:
+                    raise
+                except Exception as e:
+                    self.logger.logger.error(f"Error in monitoring loop: {e}")
+                    if process.poll() is None:
+                        process.terminate()
+                    time.sleep(5)
+        
+        except KeyboardInterrupt:
+            self.logger.logger.info("Received shutdown signal")
+            if 'process' in locals() and process.poll() is None:
                 process.terminate()
-                process.wait(timeout=10)
-                log(f"Terminated ComfyUI process (PID: {process.pid}).")
-        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-            log(f"Error while terminating process: {e}")
-
-def launch_comfyui():
-    """Launch ComfyUI as a subprocess and direct its output to a dated log file."""
-    comfyui_log_file = os.path.join(LOG_DIR, f"comfyui_log_{datetime.now().strftime('%Y-%m-%d')}.log")
-    args = [
-        "python", os.path.join(COMFYUI_DIR, "main.py"), f"--port={SERVER_PORT}"
-    ]
-
-    # Add custom parameters from .env if specified
-    if CUSTOM_PARAMETERS:
-        args += CUSTOM_PARAMETERS.split()
-
-    # Add custom paths if defined
-    if INPUT_DIR:
-        args.append(f"--input-directory={INPUT_DIR}")
-    if OUTPUT_DIR:
-        args.append(f"--output-directory={OUTPUT_DIR}")
-    if TEMP_DIR:
-        args.append(f"--temp-directory={TEMP_DIR}")
-
-    log(f"Launching ComfyUI with args: {' '.join(args)}")
-    log(f"ComfyUI output will be logged to: {comfyui_log_file}")
-
-    with open(comfyui_log_file, "a") as log_file:
-        return subprocess.Popen(args, stdout=log_file, stderr=log_file)
-
-def is_server_responding():
-    """Check if the server is responding at the specified port."""
-    try:
-        response = requests.get(f"http://127.0.0.1:{SERVER_PORT}")
-        return response.status_code == 200
-    except requests.ConnectionError:
-        return False
-
-def main():
-    script_log_filename = setup_logger("script")
-    log("Starting ComfyUI management script...")
-    log(f"Logs are being written to: {script_log_filename}")
-
-    # Clean up old logs
-    clean_old_logs()
-
-    # Create extra_model_paths.yaml if needed
-    create_extra_model_paths_yaml()
-
-    # Ensure any existing ComfyUI instances are terminated before starting a new one
-    terminate_existing_comfyui()
-    time.sleep(2)  # Brief pause to ensure the process is fully terminated
-
-    # Launch ComfyUI initially
-    process = launch_comfyui()
-    time.sleep(BOOT_WAIT_TIME)
-
-    while True:
-        # Check if the process has exited or the server is not responding
-        if process.poll() is not None:
-            log("ComfyUI process has exited. Restarting...")
-            terminate_existing_comfyui()
-            process = launch_comfyui()
-            time.sleep(BOOT_WAIT_TIME)
-        elif not is_server_responding():
-            log("Server not responding. Restarting ComfyUI...")
-            terminate_existing_comfyui()
-            process = launch_comfyui()
-            time.sleep(BOOT_WAIT_TIME)
-
-        # Clean up old logs during each check cycle
-        clean_old_logs()
-
-        # Wait before the next check
-        time.sleep(MONITOR_INTERVAL)
+        except Exception as e:
+            self.logger.logger.error(f"Critical error: {e}")
+        finally:
+            self.logger.logger.info("ComfyUI launcher stopped")
 
 if __name__ == "__main__":
-    main()
+    launcher = ComfyUILauncher()
+    launcher.run()

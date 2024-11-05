@@ -1,19 +1,44 @@
+# Diffusion Models / UNet
 unet:
-  PixelWave_FLUX.1-schnell_01:
-    repo_url: https://huggingface.co/mikeyandfriends/PixelWave_FLUX.1-schnell_01
-  Flux-Fusion-V2:
-    repo_url: https://huggingface.co/Anibaaal/Flux-Fusion-V2-4step-merge-gguf-nf4
+  # PixelWave FLUX model
+  PixelWave_FLUX.1-schnell_03:
+    repo_url: https://huggingface.co/mikeyandfriends/PixelWave_FLUX.1-schnell_03
+    description: "PixelWave FLUX.1 Schnell model for fast inference"
     include_files:
-      - GGUF/FluxFusionV2-Q4_K_M.gguf
-      - GGUF/FluxFusionV2-Q8_0.gguf
+      - pixelwave_flux1_schnell_Q6_K_M_03.gguf
 
+# VAE Models
 vae:
+  # FLUX VAE - specific folder only
   FLUX.1-schnell:
     repo_url: https://huggingface.co/black-forest-labs/FLUX.1-schnell
+    description: "FLUX.1 Schnell VAE"
     include_folder: vae
 
-clip:
-  flux_text_encoders:
+# Text Encoders (formerly CLIP Folder)
+text_encoders:
+  # FLUX/SD3.5 Text Encoders - excluding specific files
+  clip_l:
     repo_url: https://huggingface.co/comfyanonymous/flux_text_encoders
-    exclude_files:
-      - t5xxl_fp16.safetensors
+    description: "clip_l SD3.5/FLUX text encoder"
+    include_files:
+      - clip_l.safetensors
+  t5-v1_1-xxl-encoder-gguf:
+    repo_url: https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf
+    description: "T5 v1.1 XXL encoder GGUF model for SD3.5/Flux"
+    include_files:
+      - t5-v1_1-xxl-encoder-Q6_K.gguf
+  clip_g:
+    repo_url: https://huggingface.co/Comfy-Org/stable-diffusion-3.5-fp8
+    description: "clip_g SD3.5/Flux text encoder"
+    include_files:
+      - text_encoders/clip_g.safetensors
+
+
+
+# Configuration Options:
+# repo_url: URL of the Hugging Face repository
+# description: Optional description of the model/purpose
+# include_files: List of specific files to download (optional)
+# exclude_files: List of files to exclude from download (optional)
+# include_folder: Specific folder to download from repo (optional)
