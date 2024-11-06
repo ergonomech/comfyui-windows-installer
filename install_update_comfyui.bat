@@ -34,20 +34,13 @@ if NOT EXIST "%CONDA_PATH%" (
     exit /b 1
 )
 
-:: Function to echo with timestamp
-set "TIMESTAMP_CMD=powershell -Command "$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Write-Host \"[$timestamp]\""" 
+set "TIMESTAMP_CMD=powershell -Command "$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Write-Host \"[$timestamp]\"""
 
-:: Check for conda initialization
-where conda >nul 2>&1
-if %errorLevel% neq 0 (
-    echo Initializing conda for command line use...
-    call "%CONDA_PATH%\Scripts\activate.bat"
-    call conda init cmd.exe
-    echo Conda initialized. Please restart this script.
-    pause
-    exit /b 0
-)
+:: Initialize conda properly
+call "%CONDA_PATH%\Scripts\activate.bat"
+call "%CONDA_PATH%\condabin\conda.bat" activate base
 
+set "PATH=%CONDA_PATH%\condabin;%PATH%"
 set "COMFYUI_DIR=%USER_HOME%\ComfyUI"
 
 call %TIMESTAMP_CMD% "Starting ComfyUI installation/update process..."
@@ -91,6 +84,9 @@ if errorlevel 1 (
     exit /b 1
 )
 
+:: Add environment binary paths
+set "PATH=%CONDA_PATH%\envs\%COMFYUI_ENV_NAME%;%CONDA_PATH%\envs\%COMFYUI_ENV_NAME%\Scripts;%CONDA_PATH%\envs\%COMFYUI_ENV_NAME%\Library\bin;%PATH%"
+
 :: Install main ComfyUI requirements from the cloned directory
 if not exist "%COMFYUI_DIR%" (
     call %TIMESTAMP_CMD% "Cloning ComfyUI repository..."
@@ -106,11 +102,11 @@ if not exist "%COMFYUI_DIR%" (
 
 :: Install main ComfyUI requirements from the cloned directory
 if exist "%COMFYUI_DIR%\requirements.txt" (
-    call %TIMESTAMP_CMD% "Installing main ComfyUI requirements from the cloned directory..."
+    call %TIMESTAMP_CMD% "Installing main ComfyUI requirements..."
     call python -m pip install -r "%COMFYUI_DIR%\requirements.txt"
 )
 
-:: Create/Update custom_nodes directory if it does not exist
+:: Create/Update custom_nodes directory
 if not exist "%COMFYUI_DIR%\custom_nodes" (
     mkdir "%COMFYUI_DIR%\custom_nodes"
 )
@@ -155,7 +151,7 @@ for /D %%d in (*) do (
 :: Restore models if backup exists
 if exist "%USER_HOME%\comfyui_models_backup" (
     call %TIMESTAMP_CMD% "Restoring models..."
-    xcopy "%USER_HOME%\comfyui_models_backup" "%COMFYUI_DIR%\models" /E /I /H /Y
+    xcopy "%USER_HOME%\comfyui_models_backup" "%COMFYUI_DIR%\models\" /E /I /H /Y
     if not errorlevel 1 (
         rmdir /S /Q "%USER_HOME%\comfyui_models_backup"
     )
@@ -167,11 +163,21 @@ if not exist "%COMFYUI_DIR%\user\default" mkdir "%COMFYUI_DIR%\user\default"
 copy /Y "%SCRIPT_DIR%\comfy.settings.json" "%COMFYUI_DIR%\user\default\comfy.settings.json"
 copy /Y "%SCRIPT_DIR%\manager_config.ini" "%COMFYUI_DIR%\custom_nodes\ComfyUI-Manager\config.ini"
 
-:: Install PyTorch with CUDA 12.4, xformers, onnxruntime-gpu, and downgrade numpy at the end
-call %TIMESTAMP_CMD% "Installing PyTorch, xformers, onnxruntime-gpu, and downgrading numpy..."
-call python -m pip install onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ --force-reinstall
-call python -m pip install -U xformers torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
-call python -m pip install numpy<2.0 --force-reinstall
+:: Install packages with specific versions
+call %TIMESTAMP_CMD% "Installing and configuring packages..."
+call python -m pip install --no-warn-script-location --user ^
+    onnxruntime-gpu --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ --force-reinstall
+
+call python -m pip install --no-warn-script-location --user ^
+    -U xformers torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
+
+:: Version-specific installations
+call %TIMESTAMP_CMD% "Installing specific package versions..."
+call python -m pip install --no-warn-script-location --user ^
+    "numpy<2.0" ^
+    "Pillow<10" ^
+    tb-nightly ^
+    --force-reinstall
 
 call %TIMESTAMP_CMD% "Installation/Update complete!"
 echo.

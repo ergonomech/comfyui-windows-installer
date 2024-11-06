@@ -1,23 +1,24 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-:: Get the directory containing this script
+:: Get script directory with proper path handling
 set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 cd /d "%SCRIPT_DIR%"
 
-:: Load environment variables from .env file if it exists
+:: Load environment variables with proper quoting
 if exist ".env" (
     for /F "usebackq tokens=1,* delims==" %%A in (".env") do (
         set "%%A=%%B"
     )
 )
 
-:: Set default environment name if not set
+:: Set default environment name
 if not defined COMFYUI_ENV_NAME (
     set "COMFYUI_ENV_NAME=ComfyUI"
 )
 
-:: Detect conda installation
+:: Detect conda installation with proper path handling
 set "CONDA_BAT="
 if exist "%USERPROFILE%\miniconda3\condabin\conda.bat" (
     set "CONDA_BAT=%USERPROFILE%\miniconda3\condabin\conda.bat"
@@ -31,25 +32,28 @@ if exist "%USERPROFILE%\miniconda3\condabin\conda.bat" (
 
 if not defined CONDA_BAT (
     echo Error: Could not find conda installation
+    echo Please ensure Conda is installed and 'conda init --all --system' has been run
     pause
     exit /b 1
 )
 
-:: Activate conda environment and install required packages
+:: Activate environment
 echo Activating Conda environment: %COMFYUI_ENV_NAME%...
-call "%CONDA_BAT%" activate %COMFYUI_ENV_NAME%
+call "%CONDA_BAT%" activate "%COMFYUI_ENV_NAME%"
 if errorlevel 1 (
     echo Error: Failed to activate conda environment
+    echo Please ensure 'conda init --all --system' has been run first
     pause
     exit /b 1
 )
 
-:: Install required packages if needed
+:: Install required packages with proper flags
 echo Installing required packages...
-pip install python-dotenv requests psutil
+call python -m pip install --no-warn-script-location --user ^
+    python-dotenv requests psutil
 
 :: Run the launcher
 echo Starting ComfyUI...
-python "%SCRIPT_DIR%comfyui_windows.py"
+python "%SCRIPT_DIR%\comfyui_windows.py"
 
 endlocal
