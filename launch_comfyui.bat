@@ -6,13 +6,6 @@ set "SCRIPT_DIR=%~dp0"
 set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 cd /d "%SCRIPT_DIR%"
 
-:: Load environment variables with proper quoting
-if exist ".env" (
-    for /F "usebackq tokens=1,* delims==" %%A in (".env") do (
-        set "%%A=%%B"
-    )
-)
-
 :: Set default environment name
 if not defined COMFYUI_ENV_NAME (
     set "COMFYUI_ENV_NAME=ComfyUI"
@@ -22,12 +15,18 @@ if not defined COMFYUI_ENV_NAME (
 set "CONDA_BAT="
 if exist "%USERPROFILE%\miniconda3\condabin\conda.bat" (
     set "CONDA_BAT=%USERPROFILE%\miniconda3\condabin\conda.bat"
-) else if exist "%USERPROFILE%\Anaconda3\condabin\conda.bat" (
+)
+if exist "%USERPROFILE%\Anaconda3\condabin\conda.bat" (
     set "CONDA_BAT=%USERPROFILE%\Anaconda3\condabin\conda.bat"
-) else if exist "C:\ProgramData\miniconda3\condabin\conda.bat" (
+)
+if exist "C:\ProgramData\miniconda3\condabin\conda.bat" (
     set "CONDA_BAT=C:\ProgramData\miniconda3\condabin\conda.bat"
-) else if exist "C:\ProgramData\Anaconda3\condabin\conda.bat" (
+)
+if exist "C:\ProgramData\Anaconda3\condabin\conda.bat" (
     set "CONDA_BAT=C:\ProgramData\Anaconda3\condabin\conda.bat"
+)
+if exist "%USERPROFILE%\.conda\condabin\conda.bat" (
+    set "CONDA_BAT=%USERPROFILE%\.conda\condabin\conda.bat"
 )
 
 if not defined CONDA_BAT (
@@ -35,6 +34,8 @@ if not defined CONDA_BAT (
     echo Please ensure Conda is installed and 'conda init --all --system' has been run
     pause
     exit /b 1
+) else (
+    echo Found Conda installation: %CONDA_BAT%
 )
 
 :: Activate environment
@@ -45,15 +46,22 @@ if errorlevel 1 (
     echo Please ensure 'conda init --all --system' has been run first
     pause
     exit /b 1
+) else (
+    echo Conda environment activated
 )
 
-:: Install required packages with proper flags
-echo Installing required packages...
-call python -m pip install --no-warn-script-location --user ^
-    python-dotenv requests psutil
+:: make sure python is available
+call "%CONDA_BAT%" info
+python -B -I -s -u --version
+if errorlevel 1 (
+    echo Error: Python is not available
+    echo Please ensure Python is installed and available in the activated environment
+    pause
+    exit /b 1
+)
 
 :: Run the launcher
 echo Starting ComfyUI...
-python "%SCRIPT_DIR%\comfyui_windows.py"
+python -B -I -s -u "%SCRIPT_DIR%\comfyui_windows.py"
 
 endlocal

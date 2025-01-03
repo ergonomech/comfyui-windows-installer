@@ -77,7 +77,7 @@ class ComfyUILauncher:
         self.logger = ComfyUILogger()
         
         # Load environment variables
-        load_dotenv()
+        load_dotenv(override=True)
         
         # Set up paths
         self.user_home = Path(os.environ["USERPROFILE"])
@@ -89,7 +89,7 @@ class ComfyUILauncher:
         self.server_port = os.getenv("SERVER_PORT", "8188")
         self.custom_parameters = os.getenv("CUSTOM_PARAMETERS", "").split()
         self.monitor_interval = int(os.getenv("MONITOR_INTERVAL", "10"))
-        self.boot_wait_time = int(os.getenv("BOOT_WAIT_TIME", "30"))
+        self.boot_wait_time = int(os.getenv("BOOT_WAIT_TIME", "1600"))
     
     def _create_model_paths_yaml(self) -> None:
         """Create the extra_model_paths.yaml file if MODEL_BASE_PATH is set."""
@@ -120,7 +120,7 @@ comfyui:
     def _launch_comfyui(self) -> Optional[subprocess.Popen]:
         """Launch ComfyUI process with output redirection."""
         try:
-            args = ["python", str(self.comfyui_dir / "main.py"), f"--port={self.server_port}"]
+            args = ["cmd","/c","conda","activate","ComfyUI","&&","python","-B","-s","-u",str(self.comfyui_dir / "main.py"), f"--port={self.server_port}"]
             args.extend(self.custom_parameters)
             
             if self.input_dir:
@@ -132,12 +132,6 @@ comfyui:
             
             # Set up environment
             env = os.environ.copy()
-            env.update({
-                "KMP_DUPLICATE_LIB_OK": "TRUE",
-                "PYTORCH_CUDA_ALLOC_CONF": "backend:cudaMallocAsync,expandable_segments:True",
-                "CUDA_DEVICE_MAX_CONNECTIONS": "20",
-                "PYTHONUNBUFFERED": "1"
-            })
             
             self.logger.logger.info(f"Launching ComfyUI with arguments: {' '.join(args)}")
             
