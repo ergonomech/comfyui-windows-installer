@@ -269,7 +269,6 @@ for /D %%d in (*) do (
     cd ..
 )
 echo "Install other packages..."
-call python -B -I -s -u -m pip install -U typing-extensions --force-reinstall
 call python -B -I -s -u -m pip install -U gradio
 
 :: Install Torch a second time to ensure compatibility with PyTorch
@@ -282,6 +281,8 @@ if not errorlevel 1 (
     pause
     exit /b 1
 )
+echo "Installing typing-extensions..."
+call s
 
 :: Copy configuration files
 echo "Updating configuration files..."
