@@ -1,34 +1,31 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-:: Check if the script is running with administrative privileges
+REM === ComfyUI Automated Installer (Conda) ===
+REM This script installs/updates ComfyUI and its dependencies in a Conda environment.
+REM It supports Miniconda/Anaconda, avoids PowerShell, and uses only public Git repos.
+REM The script uses a cached Conda environment if available; otherwise, it creates one.
+REM Run this script from the directory where you want ComfyUI installed.
+
+REM --------------------------------------------------------------------
+REM [1] Check for elevated privileges (optional)
 net session >nul 2>&1
-if %errorlevel% neq 0 (
-    :: If not running as admin, check if the elevation flag is set
-    if "%~1" neq "--elevated" (
-        echo Running script in PowerShell as current user...
-        :: Restart the script inside cmd via PowerShell
-        powershell -NoProfile -ExecutionPolicy Bypass -Command "cmd.exe /c '%~f0' --elevated"
-        exit /b
-    ) else (
-        echo Continuing as current user without elevated privileges...
-    )
+if %ERRORLEVEL%==0 (
+    echo [INFO] Running with elevated privileges.
+) else (
+    echo [INFO] Running without elevated privileges.
 )
 
-:: Set default environment variables
-set "RECREATE_CONDA_ENV=true"
-set "COMFYUI_ENV_NAME=ComfyUI"
-
-:: Function to echo with timestamp
-set "TIMESTAMP_CMD=powershell -Command "$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'; Write-Host \"[$timestamp]\""" 
-where conda >nul 2>&1
+REM --------------------------------------------------------------------
+REM [2] Verify required programs: Git must be available.
 where git >nul 2>&1
-if errorlevel 1 (
-    echo "Error: Required programs not found, please ensure Git, Python, and Conda are installed and in the system PATH"
-    pause
-    exit /b 1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Git is not installed or not in PATH. Please install Git and try again.
+    goto END
 )
-:: Detect conda installation with proper path handling
+
+REM --------------------------------------------------------------------
+REM [3] Locate Conda installation (Miniconda/Anaconda) by setting CONDA_BAT.
 set "CONDA_BAT="
 if exist "%USERPROFILE%\miniconda3\condabin\conda.bat" (
     set "CONDA_BAT=%USERPROFILE%\miniconda3\condabin\conda.bat"
@@ -45,260 +42,180 @@ if exist "C:\ProgramData\Anaconda3\condabin\conda.bat" (
 if exist "%USERPROFILE%\.conda\condabin\conda.bat" (
     set "CONDA_BAT=%USERPROFILE%\.conda\condabin\conda.bat"
 )
-
 if not defined CONDA_BAT (
-    echo Error: Could not find conda installation
-    echo Please ensure Conda is installed and 'conda init --all --system' has been run
-    pause
-    exit /b 1
+    echo [ERROR] Conda installation not found. Please install Miniconda/Anaconda and try again.
+    goto END
+)
+echo [INFO] Found Conda at: %CONDA_BAT%
+
+REM --------------------------------------------------------------------
+REM [4] Activate base Conda environment (so conda commands work).
+call "%CONDA_BAT%" activate base
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Failed to activate base Conda environment.
+    goto END
 )
 
-:: Set environment variables
-set "USER_HOME=%USERPROFILE%"
-echo "User home directory: %USER_HOME%"
-echo "ComfyUI environment name: %COMFYUI_ENV_NAME%"
-echo "Recreate conda environment: %RECREATE_CONDA_ENV%"
-set "COMFYUI_DIR=%USER_HOME%\%COMFYUI_ENV_NAME%"
-echo "ComfyUI directory: %COMFYUI_DIR%"
-if not exist "%COMFYUI_DIR%" (
-    echo "Error: ComfyUI directory does not exist, it will be populated during installation"
-)
+REM --------------------------------------------------------------------
+REM [5] Set environment variables for the installation.
+set "COMFYUI_ENV_NAME=ComfyUI"
+REM Here, ComfyUI will be cloned into %USERPROFILE%\ComfyUI
+set "COMFYUI_DIR=%USERPROFILE%\%COMFYUI_ENV_NAME%"
+echo [INFO] ComfyUI environment name: %COMFYUI_ENV_NAME%
+echo [INFO] ComfyUI directory: %COMFYUI_DIR%
 
-:: Get script directory
-set "SCRIPT_DIR=%~dp0"
-cd /d "%SCRIPT_DIR%"
-
-:: Validate conda user based installation
-echo "Checking for conda installation..."
-set "CONDA_ENVS_PATH=%USER_HOME%\.conda\envs"
-if NOT EXIST "%CONDA_ENVS_PATH%" set "CONDA_ENVS_PATH=%USER_HOME%\miniconda3\envs"
-iF NOT EXIST "%CONDA_ENVS_PATH%" set "CONDA_ENVS_PATH=%USER_HOME%\anaconda3\envs"
-if NOT EXIST "%CONDA_ENVS_PATH%" (
-    call conda info
-    if errorlevel 1 (
-        echo "Error: Failed to see conda, please install Anaconda or Miniconda and try again"
-        pause
-        exit /b 1
-    ) else (
-        echo "Conda is Installed, but current user does not have environments, troubleshoot by creating a new environment manually"
-        pause
-        exit /b 1
-    )
-)
-
-:: Activate environment
-echo Activating Base Conda environment...
-call "%CONDA_BAT%" activate "base"
-if errorlevel 1 (
-    echo Error: Failed to activate conda environment
-    echo Please ensure 'conda init --all --system' has been run first
-    pause
-    exit /b 1
-)
-echo "Conda base is installed and activated, checking for python..."
-call python -B -I -s -u --version
-if errorlevel 1 (
-    echo "Error: Failed to see python"
-    pause
-    exit /b 1
-)
-
-echo "Starting ComfyUI installation/update process..."
-
-:: Create or recreate environment based on conditions
-echo "Creating new conda environment: %COMFYUI_ENV_NAME%..."
-call conda env list | findstr /B /C:"%COMFYUI_ENV_NAME% "
-set "ENV_EXISTS_ERROR=!errorlevel!"
-if "%RECREATE_CONDA_ENV%"=="true" (
-    if !ENV_EXISTS_ERROR! EQU 0 (
-        echo "Recreating existing conda environment: %COMFYUI_ENV_NAME%"
-        call conda create --no-default-packages --yes --channel conda-forge --name %COMFYUI_ENV_NAME% python=3.12
-    )
-    if !ENV_EXISTS_ERROR! EQU 1 (
-        echo "Creating conda environment: %COMFYUI_ENV_NAME%"
-        call conda create --no-default-packages --yes --channel conda-forge --name %COMFYUI_ENV_NAME% python=3.12
-    )
+REM --------------------------------------------------------------------
+REM [6] Use cached Conda environment if available; otherwise, create a new one.
+echo [INFO] Checking for Conda environment "%COMFYUI_ENV_NAME%"...
+call conda env list | findstr /I "\<%COMFYUI_ENV_NAME%\>" >nul
+if %ERRORLEVEL%==0 (
+    echo [INFO] Environment "%COMFYUI_ENV_NAME%" exists. Using cached environment.
 ) else (
-    if !ENV_EXISTS_ERROR! EQU 0 (
-        echo "Conda environment already exists: %COMFYUI_ENV_NAME%"
+    echo [INFO] Creating new Conda environment "%COMFYUI_ENV_NAME%"...
+    call "%CONDA_BAT%" create --no-default-packages --yes --channel conda-forge --name %COMFYUI_ENV_NAME% python=3.12
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] Failed to create Conda environment "%COMFYUI_ENV_NAME%". Aborting.
+        goto END
     )
-    if !ENV_EXISTS_ERROR! EQU 1 (
-        echo "Error: Conda environment does not exist: %COMFYUI_ENV_NAME%"
-        call conda create --no-default-packages --yes --channel conda-forge --name %COMFYUI_ENV_NAME% python=3.12
-    )
+    echo [INFO] Environment "%COMFYUI_ENV_NAME%" created successfully.
 )
 
-:: Activate conda environment
-echo "Activating conda environment: %COMFYUI_ENV_NAME%"
-call conda env list | findstr /B /C:"%COMFYUI_ENV_NAME% "
-:: Activate environment
-call "%CONDA_BAT%" activate "%COMFYUI_ENV_NAME%"
-if errorlevel 1 (
-    echo "Error: Failed to activate conda environment"
-    pause
-    exit /b 1
-) else (
-    echo "Conda environment activate, lets make sure we can see python...."
-    if not exist "%CONDA_ENVS_PATH%\%COMFYUI_ENV_NAME%\python.exe" (
-        echo "Conda Environment Path is Hardcoded Wrong, please troubleshoot and try again"
-        pause
-        exit /b 1
-    )
-    call python -B -I -s -u --version
-    if errorlevel 1 (
-        echo "Error: Failed to see python"
-        pause
-        exit /b 1
-    )
+REM --------------------------------------------------------------------
+REM [7] Activate the ComfyUI environment.
+call "%CONDA_BAT%" activate %COMFYUI_ENV_NAME%
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Failed to activate environment "%COMFYUI_ENV_NAME%". Aborting.
+    goto END
+)
+echo [INFO] Activated Conda environment: %COMFYUI_ENV_NAME%
+call python --version >nul 2>&1
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Python not found in the environment. Aborting.
+    goto END
 )
 
-:: Pre update package installations
-echo "Installing Pre Update Packages..."
-call python -B -I -s -u -m pip install -U python-dotenv requests psutil
-if not errorlevel 1 (
-    echo "Installed Pre Update Packages"
-) else (
-    echo "Failed to install Pre Update Packages"
-    pause
-    exit /b 1
-)
-echo "Installing onxxruntime for GPU..."
-call python -B -I -s -u -m pip install -U onnxruntime-gpu
-echo "Installing xformers..."
-call python -B -I -s -u -m pip install -U xformers --index-url https://download.pytorch.org/whl/cu124
-echo "Installing PyTorch for CUDA 12.4..."
-call python -B -I -s -u -m pip install -U torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-if not errorlevel 1 (
-    echo "Installed PyTorch for CUDA 12.4"
-) else (
-    echo "Failed to install PyTorch for CUDA 12.4"
-    pause
-    exit /b 1
-)
-
-:: Install main ComfyUI requirements from the cloned directory
-if not exist "%COMFYUI_DIR%" (
-    echo "Cloning ComfyUI repository..."
+REM --------------------------------------------------------------------
+REM [8] Clone or update the ComfyUI repository.
+if not exist "%COMFYUI_DIR%\.git" (
+    echo [INFO] Cloning ComfyUI repository into "%COMFYUI_DIR%"...
     mkdir "%COMFYUI_DIR%"
-    cd "%COMFYUI_DIR%"
+    pushd "%COMFYUI_DIR%"
     git clone https://github.com/comfyanonymous/ComfyUI.git .
-    if errorlevel 1 (
-        echo "Error: Failed to clone ComfyUI repository"
-        pause
-        exit /b 1
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] Failed to clone ComfyUI repository. Aborting.
+        popd
+        goto END
     )
+    REM Trust this directory even if moved
+    git config --global --add safe.directory "%COMFYUI_DIR%"
+    popd
 ) else (
-    echo "Updating ComfyUI repository..."
-    cd "%COMFYUI_DIR%"
-    git config --global --add safe.directory .
+    echo [INFO] Updating ComfyUI repository in "%COMFYUI_DIR%"...
+    pushd "%COMFYUI_DIR%"
+    REM Trust this directory even if moved
+    git config --global --add safe.directory "%COMFYUI_DIR%"
     git stash
-    git pull
+    git pull --ff-only
+    popd
 )
 
-:: Install main ComfyUI requirements from the cloned directory
-cd "%COMFYUI_DIR%"
-if exist "requirements.txt" (
-    echo "Installing main ComfyUI requirements..."
-    call python -B -I -s -u -m pip install -U -r requirements.txt
-    if errorlevel 1 (
-        echo "Error: Failed to install main ComfyUI requirements"
-        pause
-        exit /b 1
-    )
-)
+REM --------------------------------------------------------------------
+REM [9] Clone or update custom node repositories.
+set "CUSTOM_NODES_DIR=%COMFYUI_DIR%\custom_nodes"
+cd /d "%COMFYUI_DIR%"
+if not exist "%CUSTOM_NODES_DIR%" mkdir "%CUSTOM_NODES_DIR%"
+pushd "%CUSTOM_NODES_DIR%"
 
-:: Create/Update custom_nodes directory
-if not exist "%COMFYUI_DIR%\custom_nodes" (
-    mkdir "%COMFYUI_DIR%\custom_nodes"
-    echo "Created custom_nodes directory"
-) else (
-    echo "custom_nodes directory already exists at %COMFYUI_DIR%\custom_nodes"
-)
+REM Configure Git credential helper to avoid login prompts.
+git config --global credential.helper manager-core
 
-:: Define custom nodes repositories
+REM Define custom nodes repositories.
 set "CUSTOM_NODES_REPOS[0]=https://github.com/ltdrdata/ComfyUI-Manager.git"
 set "CUSTOM_NODES_REPOS[1]=https://github.com/rgthree/rgthree-comfy.git"
-set "CUSTOM_NODES_REPOS[2]=https://github.com/cubiq/ComfyUI_IPAdapter_plus.git"
-set "CUSTOM_NODES_REPOS[3]=https://github.com/ltdrdata/ComfyUI-Impact-Pack.git"
-set "CUSTOM_NODES_REPOS[4]=https://github.com/ltdrdata/ComfyUI-Inspire-Pack.git"
 set "CUSTOM_NODES_REPOS[5]=https://github.com/city96/ComfyUI_ExtraModels.git"
 set "CUSTOM_NODES_REPOS[6]=https://github.com/city96/ComfyUI-GGUF.git"
-set "CUSTOM_NODES_REPOS[7]=https://github.com/Gourieff/comfyui-reactor-node.git"
 
-:: Clone or update custom nodes repositories
-cd "%COMFYUI_DIR%\custom_nodes"
 for /L %%i in (0,1,7) do (
     set "REPO_URL=!CUSTOM_NODES_REPOS[%%i]!"
-    set "REPO_NAME=!REPO_URL:~19,-4!"
-    if not exist "!REPO_NAME!" (
-        echo "Cloning custom node: !REPO_NAME!..."
-        git clone !REPO_URL!
-    ) else (
-        echo "Updating custom node: !REPO_NAME!..."
-        cd "!REPO_NAME!"
-        git config --global --add safe.directory .
-        git stash
-        git pull
-        cd ..
+    if defined REPO_URL (
+        REM Extract repository name from URL (strip .git and path components)
+        for %%A in ("!REPO_URL!") do set "REPO_NAME=%%~nA"
+        set "TARGET_DIR=%CUSTOM_NODES_DIR%\!REPO_NAME!"
+        if not exist "!TARGET_DIR!" (
+            echo [INFO] Cloning custom node: !REPO_NAME!...
+            git clone "!REPO_URL!" "!TARGET_DIR!"
+            if !ERRORLEVEL! neq 0 (
+                echo [ERROR] Failed to clone custom node repository: !REPO_NAME!
+                popd
+                goto END
+            )
+            REM Trust this custom_nodes directory even if moved
+            git config --global --add safe.directory "!TARGET_DIR!"
+        ) else (
+            echo [INFO] Updating custom node: !REPO_NAME!...
+            pushd "!TARGET_DIR!"
+            REM Trust this custom_nodes directory even if moved
+            git config --global --add safe.directory "%CD%"
+            git stash
+            git pull --ff-only
+            popd
+        )
+    )
+)
+popd
+
+REM --------------------------------------------------------------------
+REM [10] Install pre-update packages.
+echo [INFO] Installing pre-update packages...
+python -m pip install --no-user python-dotenv requests psutil
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Failed to install pre-update packages. Aborting.
+    goto END
+)
+
+REM --------------------------------------------------------------------
+REM [11] Install onnxruntime for GPU.
+echo [INFO] Installing onnxruntime for GPU...
+python -m pip install --no-user onnxruntime-gpu
+
+REM --------------------------------------------------------------------
+REM [12] Install PyTorch for CUDA 12.8.
+echo [INFO] Installing PyTorch (CUDA 12.8) and related packages...
+python -m pip install --no-user torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 --force-reinstall
+if %ERRORLEVEL% neq 0 (
+    echo [ERROR] Failed to install PyTorch for CUDA 12.8. Aborting.
+    goto END
+)
+
+REM --------------------------------------------------------------------
+REM [13] Install main ComfyUI requirements from requirements.txt.
+cd /d "%COMFYUI_DIR%"
+if exist "requirements.txt" (
+    echo [INFO] Installing main ComfyUI requirements...
+    python -m pip install --no-user -r requirements.txt
+    if %ERRORLEVEL% neq 0 (
+        echo [ERROR] Failed to install main ComfyUI requirements. Aborting.
+        goto END
     )
 )
 
-:: Iterate through all subdirectories in custom_nodes
-cd "%COMFYUI_DIR%\custom_nodes"
-for /D %%d in (*) do (
-    set "NODE_DIR=%%d"
-    cd "!NODE_DIR!"
-    
-    :: Check if the directory is a git repository and pull updates if so
-    if exist ".git" (
-        call %TIMESTAMP_CMD% "Updating custom node: !NODE_DIR!..."
-        git config --global --add safe.directory .
-        git stash
-        git pull
-    )
-
-    :: Install node-specific dependencies if install files or requirements.txt exist
-    if exist "requirements.txt" (
-        call %TIMESTAMP_CMD% "Installing requirements.txt for !NODE_DIR!..."
-        call python -B -I -s -u -m pip install -U -r requirements.txt
-        set "INSTALL_FLAG=1"
-    )
-    if not defined INSTALL_FLAG (
-        call %TIMESTAMP_CMD% "No installation files found for !NODE_DIR!..."
-    )
-    cd ..
-)
-echo "Install other packages..."
-call python -B -I -s -u -m pip install -U gradio
-
-:: Install Torch a second time to ensure compatibility with PyTorch
-echo "Installing PyTorch for CUDA 12.4...again"
-call python -B -I -s -u -m pip install -U torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 --force-reinstall
-if not errorlevel 1 (
-    echo "Installed PyTorch for CUDA 12.4"
-) else (
-    echo "Failed to install PyTorch for CUDA 12.4"
-    pause
-    exit /b 1
-)
-echo "Installing typing-extensions..."
-call s
-
-:: Copy configuration files
-echo "Updating configuration files..."
+REM --------------------------------------------------------------------
+REM [14] Copy configuration files.
+echo [INFO] Updating configuration files...
 if not exist "%COMFYUI_DIR%\user\default" mkdir "%COMFYUI_DIR%\user\default"
-copy /Y "%SCRIPT_DIR%\comfy.settings.json" "%COMFYUI_DIR%\user\default\comfy.settings.json"
-if not exist "%COMFYUI_DIR%\user\default\comfy.settings.json" (
-    echo "Error: Failed to copy comfy.settings.json"
-)
-copy /Y "%SCRIPT_DIR%\manager_config.ini" "%COMFYUI_DIR%\custom_nodes\ComfyUI-Manager\config.ini"
-if not exist "%COMFYUI_DIR%\custom_nodes\ComfyUI-Manager\config.ini" (
-    echo "Error: Failed to copy manager_config.ini"
-)
+copy /Y "%~dp0\comfy.settings.json" "%COMFYUI_DIR%\user\default\comfy.settings.json"
+copy /Y "%~dp0\manager_config.ini" "%CUSTOM_NODES_DIR%\ComfyUI-Manager\config.ini"
 
-:: Finish
-echo Finished installation/update process.
+REM --------------------------------------------------------------------
+REM [15] Completion message.
+echo.
+echo [SUCCESS] Finished installation/update process.
 echo Next steps:
-echo 1. Use launch_comfyui.bat to start ComfyUI
-echo 2. Check the logs folder for any issues
+echo   - Use launch_comfyui.bat to start ComfyUI.
+echo   - Check the logs folder for any issues.
+pause
+
+:END
+echo.
+echo [ERROR] Installer encountered a problem. Check above logs.
 pause
