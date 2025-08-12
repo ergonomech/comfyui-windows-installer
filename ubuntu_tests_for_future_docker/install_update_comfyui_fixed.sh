@@ -129,7 +129,7 @@ done
 # --------------------------------------------------------------------
 # [8] Install pre-update packages.
 echo "[INFO] Installing pre-update packages..."
-"$PYTHON_BIN" -m pip install python-dotenv requests psutil || echo "[WARNING] Failed to install some pre-update packages, continuing anyway"
+"$PYTHON_BIN" -m pip install python-dotenv psutil || echo "[WARNING] Failed to install some pre-update packages, continuing anyway"
 
 # --------------------------------------------------------------------
 # [9] Install onnxruntime for GPU.

@@ -207,7 +207,7 @@ if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to upgrade pip and core packages. Aborting.
     goto END
 )
-python -m pip install --no-user python-dotenv requests psutil
+python -m pip install --no-user python-dotenv psutil
 if %ERRORLEVEL% neq 0 (
     echo [ERROR] Failed to install pre-update packages. Aborting.
     goto END
