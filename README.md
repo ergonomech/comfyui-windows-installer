@@ -1,150 +1,147 @@
-# ComfyUI Installation and Launcher for Windows
+# ComfyUI for Windows (Installer + Launcher)
+
 ![Header](readme_assets/header.png)
 
-This guide provides detailed instructions for setting up and running ComfyUI on Windows using Miniconda. The goal is to simplify the installation process, integrate essential plugins for enhanced usability, and enable error correction with automatic relaunching of the server when needed. Additionally, it allows storing cache and models on separate drives, such as NAS or DAS storage, for optimized performance and storage management.
+Fast, repeatable ComfyUI setup for Windows 11 with CUDA 12.8. This repo installs a clean Conda environment, the right PyTorch build for your GPU, and a lightweight supervisor that launches ComfyUI headlessly and shuts it down cleanly when you close the window.
+
+Highlights
+
+- Windows 11 tested end-to-end
+- Conda env: Python 3.12.11 (falls back to latest 3.12.x if needed)
+- PyTorch CUDA 12.8 wheels (fallback to CUDA 12.6 if 12.8 is unavailable)
+- Foreground launcher: Ctrl+C or closing the window kills all subprocesses
+- Log-based watcher (no HTTP probes), gentler restarts, rotating logs
+
+> Status (2025-08-12)
+>
+> ComfyUI Desktop exists, but this installer is still maintained for users who want to host or run ComfyUI as a service/foreground process on Windows. The scripts and CUDA 12.8/Python 3.12.11 stack are up to date and ready.
 
 ## Prerequisites
 
-Before running the installer, ensure that your system meets the following requirements:
+Make sure you have:
 
-1. **Latest NVIDIA Driver**
-   - Download and install the latest NVIDIA drivers for your GPU from the [NVIDIA Driver Download page](https://www.nvidia.com/Download/index.aspx)
-   
-2. **Microsoft Visual C++ Build Tools**
-   - Install the Microsoft C++ Build Tools, which are necessary for compiling certain Python packages
-   - [Download Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
-   
-3. **Miniconda**
-   - Install Miniconda for managing the Python environment
-   - [Download Miniconda](https://docs.conda.io/en/latest/miniconda.html)
-   - After installing Miniconda, initialize Conda by running the conda created console as Administrator:
-     ```bash
-     conda init --all --system
-     ```
+- NVIDIA GPU drivers (latest) — <https://www.nvidia.com/Download/index.aspx>
+- Git — <https://git-scm.com/downloads> (Git LFS recommended)
+- Miniconda — <https://docs.conda.io/en/latest/miniconda.html>
 
-4. **Git**
-   - Install Git for cloning repositories and model management
-   - [Download Git](https://git-scm.com/downloads)
-   - Ensure Git LFS is installed for large file handling
+   After install, in an elevated Conda prompt run:
 
-## Installation
-
-1. **Get the Installation Files**
-   - Clone this repository or download the provided scripts
-   - Ensure all batch files are in the same directory
-
-2. **Configure Environment Settings**
-   - Edit the `.env` file to customize your installation:
-     - Set model paths for external storage
-     - Configure cache locations
-     - Adjust environment variables
-     - Set custom directories for input/output
-
-3. **Run the Installation**
-   ```bash
-   install_comfy_windows.bat
+   ```bat
+   conda init --all --system
    ```
-   This will:
-   - Create a new Conda environment
-   - Install all required dependencies
-   - Clone ComfyUI and essential plugins
-   - Configure your specified paths
 
-## Model Installation
+- (Optional) Microsoft Visual C++ Build Tools — some nodes may need it: <https://visualstudio.microsoft.com/visual-cpp-build-tools/>
 
-Use `install_models.bat` to manage your model installation:
-```bash
+## Install or Update
+
+1) Clone or download this repository.
+2) Run the installer:
+
+   ```bat
+   install_update_comfyui.bat
+   ```
+
+What it does
+
+- Creates/uses Conda env "ComfyUI" with Python 3.12.11
+- Installs PyTorch + CUDA 12.8 (falls back to 12.6 if needed)
+- Installs onnxruntime-gpu (falls back to CPU)
+- Clones/updates ComfyUI into `%USERPROFILE%\ComfyUI`
+- Adds a few helpful custom nodes (see below)
+- Verifies versions and cleans pip cache
+
+## Models
+
+Use the helper to fetch models defined in `model_config.yaml`:
+
+```bat
 install_models.bat
 ```
 
-Models are configured in `model_config.yaml` with the following structure:
+`model_config.yaml` example:
+
 ```yaml
 unet:
-  model_name:
-    repo_url: "https://huggingface.co/..."
-    include_files:
-      - specific_file.safetensors
-    
+   my_model:
+      repo_url: "https://huggingface.co/..."
+      include_files:
+         - example.safetensors
+
 vae:
-  model_name:
-    repo_url: "https://huggingface.co/..."
-    include_folder: vae
+   another:
+      repo_url: "https://huggingface.co/..."
+      include_folder: vae
 ```
 
-## Launching ComfyUI
+## Launch
 
-### Standard Launch
-Start ComfyUI using the launcher script:
-```bash
+Start ComfyUI:
+
+```bat
 launch_comfyui.bat
 ```
-Access the web interface at: `http://127.0.0.1:8188`
 
-### Running as a Windows Service
+- Opens at: <http://127.0.0.1:8188> (default)
+- Foreground by default — close the window to stop everything
+- Logs live under `logs/` (rotated)
 
-For a more robust setup, you can run ComfyUI as a Windows service using NSSM:
+Quiet output
 
-1. **Install NSSM**
-   - Download NSSM from [nssm.cc](https://nssm.cc/download)
-   - Extract nssm.exe to a permanent location
-   - Add the NSSM directory to your system PATH
+- Set `HEADLESS=1` before launching to suppress the environment summary prints (process still runs foreground):
 
-2. **Create the Service**
-   ```bash
-   nssm install ComfyUI
+   ```bat
+   set HEADLESS=1 && launch_comfyui.bat
    ```
 
-3. **Configure Service Settings**
-   In the NSSM configuration window:
-   - Application Path: Full path to `launch_comfyui.bat`
-   - Start Directory: Your ComfyUI installation directory
-   - Service Name: ComfyUI
-   - Log on Tab: Select 'This Account' and use your Windows account
-   - I/O Tab: Set output and error logs paths
+## Configuration (.env is optional)
 
-4. **Start the Service**
-   ```bash
-   nssm start ComfyUI
-   ```
+You don’t need a `.env` file. Defaults work out of the box. If you want to customize paths/port/flags:
 
-5. **Additional Service Management**
-   ```bash
-   nssm stop ComfyUI            # Stop the service
-   nssm restart ComfyUI         # Restart the service
-   nssm remove ComfyUI confirm  # Remove the service
-   nssm edit ComfyUI           # Edit service configuration
-   ```
 
-## Maintaining Your Installation
+- HEADLESS: Quiet mode for launcher prints (1=quiet, 0=show env summary)
+- COMFYUI_ENV_NAME: Conda environment name (default: ComfyUI)
 
-### Updates
-Update your installation with:
-```bash
-install_update_comfyui.bat
-```
+Watcher tuning (advanced)
 
-### Uninstallation
-Remove the installation with:
-```bash
-uninstall_comfyui.bat
-```
+- ENABLE_NO_OUTPUT_RESTART=1
+- NO_OUTPUT_RESTART_SECS=600
+- QUIET_CPU_THRESHOLD=2.0
+- QUIET_CPU_WINDOW_SECS=300
+- BOOT_WAIT_TIME=1600
+- MONITOR_INTERVAL=10
 
 ## Included Custom Nodes
-- ComfyUI-Manager: Management interface
-- rgthree-comfy: Enhanced node collection
-- ComfyUI_IPAdapter_plus: IP-Adapter integration
-- ComfyUI-Impact-Pack: Advanced processing nodes
-- ComfyUI-Inspire-Pack: Creative workflow nodes
-- ComfyUI_ExtraModels: Additional model support
-- ComfyUI-GGUF: GGUF model support
-- comfyui-reactor-node: Face processing tools
-- ComfyUI-Adaptive-Guidance: Enhanced sampling controls
+
+The installer clones/updates these by default:
+
+- ComfyUI-Manager — <https://github.com/ltdrdata/ComfyUI-Manager>
+- rgthree-comfy — <https://github.com/rgthree/rgthree-comfy>
+- ComfyUI_ExtraModels — <https://github.com/city96/ComfyUI_ExtraModels>
+- ComfyUI-GGUF — <https://github.com/city96/ComfyUI-GGUF>
+
+You can add more by cloning into `ComfyUI/custom_nodes/`.
+
+## Service mode (optional)
+
+If you prefer running as a background service, tools like NSSM work well. Point the service to `launch_comfyui.bat` and set a working directory for logs. Note that Ctrl+C behavior doesn’t apply to services.
+
+## Update / Uninstall
+
+- Update: re-run `install_update_comfyui.bat`
+- Uninstall: remove `%USERPROFILE%\ComfyUI` and the Conda env `ComfyUI` (e.g., `conda remove -n ComfyUI --all`)
+
+## Tech notes
+
+- Environment: Conda `ComfyUI`, Python 3.12.11 (or latest 3.12.x)
+- PyTorch: CUDA 12.8 wheels by default, CUDA 12.6 fallback
+- Supervisor: no HTTP/TCP health checks; uses logs + CPU quiet periods
+- Clean shutdown: Ctrl+C or closing the console terminates the whole process tree
 
 ## License
-This project is released under the [MIT License](https://opensource.org/licenses/MIT).
 
-## Acknowledgments
-- ComfyUI by [comfyanonymous](https://github.com/comfyanonymous/ComfyUI)
-- All custom node developers listed in the included nodes section
+MIT. See LICENSE.
 
-For issues, updates, and contributions, please visit the project repository.
+## Credits
+
+- ComfyUI by <https://github.com/comfyanonymous/ComfyUI>
+- The authors of the included custom nodes

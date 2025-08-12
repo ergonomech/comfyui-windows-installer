@@ -3,7 +3,6 @@ import sys
 import time
 import uuid
 import subprocess
-import requests
 import logging
 import logging.handlers
 import psutil
@@ -11,6 +10,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Optional
 from dotenv import load_dotenv
+import threading
+import signal
 
 class ComfyUILogger:
     """Handles logging with date, UUID, and PID in filename."""
@@ -72,13 +73,21 @@ class ComfyUILogger:
             self.logger.error(f"Error cleaning old logs: {e}")
 
 class ComfyUILauncher:
+    # Class-level annotations to satisfy static analysis
+    _readiness_event: threading.Event
+    _last_output_lock: threading.Lock
+    _last_output_ts: float
+    no_output_restart_secs: int
+    monitor_interval: int
+    boot_wait_time: int
+    server_port: str
     def __init__(self):
         # Initialize logger first
         self.logger = ComfyUILogger()
-        
+
         # Load environment variables
         load_dotenv(override=True)
-        
+
         # Set up paths
         self.user_home = Path(os.environ["USERPROFILE"])
         self.comfyui_dir = Path(os.getenv("COMFYUI_DIR", self.user_home / "ComfyUI"))
@@ -88,8 +97,19 @@ class ComfyUILauncher:
         self.temp_dir = os.getenv("TEMP_DIR")
         self.server_port = os.getenv("SERVER_PORT", "8188")
         self.custom_parameters = os.getenv("CUSTOM_PARAMETERS", "").split()
+
+        # Timings and monitoring thresholds
         self.monitor_interval = int(os.getenv("MONITOR_INTERVAL", "10"))
         self.boot_wait_time = int(os.getenv("BOOT_WAIT_TIME", "1600"))
+        self.no_output_restart_secs = int(os.getenv("NO_OUTPUT_RESTART_SECS", "600"))
+        self.enable_no_output_restart = os.getenv("ENABLE_NO_OUTPUT_RESTART", "1") not in ("0", "false", "False")
+        self.quiet_cpu_threshold = float(os.getenv("QUIET_CPU_THRESHOLD", "2.0"))
+        self.quiet_cpu_window_secs = int(os.getenv("QUIET_CPU_WINDOW_SECS", "300"))
+
+        # Runtime state for monitoring
+        self._readiness_event = threading.Event()
+        self._last_output_lock = threading.Lock()
+        self._last_output_ts = time.time()
     
     def _create_model_paths_yaml(self) -> None:
         """Create the extra_model_paths.yaml file if MODEL_BASE_PATH is set."""
@@ -118,9 +138,10 @@ comfyui:
             self.logger.logger.info(f"Created model paths configuration at {yaml_path}")
     
     def _launch_comfyui(self) -> Optional[subprocess.Popen]:
-        """Launch ComfyUI process with output redirection."""
+        """Launch ComfyUI process with output redirection, headless by default."""
         try:
-            args = ["cmd","/c","conda","activate","ComfyUI","&&","python","-B","-s","-u",str(self.comfyui_dir / "main.py"), f"--port={self.server_port}"]
+            # Prefer launching directly with the current Python (env already activated by the batch file)
+            args = [sys.executable, "-B", "-s", "-u", str(self.comfyui_dir / "main.py"), f"--port={self.server_port}"]
             args.extend(self.custom_parameters)
             
             if self.input_dir:
@@ -139,10 +160,37 @@ comfyui:
                 try:
                     with pipe:
                         for line in iter(pipe.readline, ''):
-                            log_func(line.strip())
+                            line = line.strip()
+                            log_func(line)
+                            now = time.time()
+                            # Update last output timestamp
+                            with self._last_output_lock:
+                                self._last_output_ts = now
+                            # Detect readiness from known messages
+                            lower = line.lower()
+                            if (
+                                "to see the gui" in lower
+                                or "running on" in lower
+                                or "started server" in lower
+                                or "listening on" in lower
+                            ):
+                                self._readiness_event.set()
                 except Exception as e:
                     self.logger.logger.error(f"Error reading output: {e}")
             
+            # On Windows, ensure no new console window is created for the child process
+            creationflags = 0
+            startupinfo = None
+            if os.name == "nt":
+                creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+                try:
+                    si = subprocess.STARTUPINFO()
+                    si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    si.wShowWindow = 0  # SW_HIDE
+                    startupinfo = si
+                except Exception:
+                    startupinfo = None
+
             process = subprocess.Popen(
                 args,
                 stdout=subprocess.PIPE,
@@ -150,10 +198,11 @@ comfyui:
                 text=True,
                 bufsize=1,
                 env=env,
-                cwd=str(self.comfyui_dir)
+                cwd=str(self.comfyui_dir),
+                creationflags=creationflags,
+                startupinfo=startupinfo
             )
             
-            import threading
             threading.Thread(
                 target=output_reader,
                 args=(process.stdout, self.logger.logger.info),
@@ -171,53 +220,163 @@ comfyui:
             self.logger.logger.error(f"Failed to launch ComfyUI: {e}")
             return None
     
-    def _is_server_responding(self) -> bool:
-        """Check if the ComfyUI server is responding."""
+    def _terminate_tree(self, proc: subprocess.Popen, timeout: int = 15):
+        """Terminate a process and its children safely."""
         try:
-            response = requests.get(f"http://127.0.0.1:{self.server_port}", timeout=5)
-            return response.status_code == 200
-        except requests.RequestException:
-            return False
+            p = psutil.Process(proc.pid)
+        except psutil.Error:
+            return
+        # Terminate children first
+        try:
+            for child in p.children(recursive=True):
+                try:
+                    child.terminate()
+                except psutil.Error:
+                    pass
+        except psutil.Error:
+            pass
+        # Terminate main process
+        try:
+            p.terminate()
+        except psutil.Error:
+            pass
+        try:
+            proc.wait(timeout=timeout)
+        except Exception:
+            try:
+                p.kill()
+            except psutil.Error:
+                pass
     
     def run(self):
         """Run ComfyUI with monitoring and auto-restart."""
+        process: Optional[subprocess.Popen] = None
+        shutdown_event = threading.Event()
+
+        def handle_sig(signum, frame):
+            try:
+                self.logger.logger.info(f"Received signal {signum}; terminating subprocess tree...")
+            except Exception:
+                pass
+            shutdown_event.set()
+            try:
+                if process and process.poll() is None:
+                    self._terminate_tree(process)
+            except Exception:
+                pass
+
+        # Register signal handlers for Ctrl+C / termination on Windows
+        try:
+            signal.signal(signal.SIGINT, handle_sig)
+        except Exception:
+            pass
+        for sig_name in ("SIGTERM", "SIGBREAK"):
+            if hasattr(signal, sig_name):
+                try:
+                    signal.signal(getattr(signal, sig_name), handle_sig)
+                except Exception:
+                    pass
+
+        # On Windows, also handle console close/logoff/shutdown events
+        if os.name == "nt":
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                kernel32 = ctypes.windll.kernel32
+                HandlerRoutine = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
+
+                def _win_ctrl_handler(ctrl_type):
+                    # ctrl_type: 0=CTRL_C_EVENT, 1=CTRL_BREAK_EVENT, 2=CTRL_CLOSE_EVENT, 5=CTRL_LOGOFF_EVENT, 6=CTRL_SHUTDOWN_EVENT
+                    try:
+                        self.logger.logger.info(f"Received console control event {ctrl_type}; terminating subprocess tree...")
+                    except Exception:
+                        pass
+                    try:
+                        handle_sig(getattr(signal, "SIGBREAK", 21), None)
+                    except Exception:
+                        pass
+                    return True
+
+                # Keep a reference to avoid GC
+                self._win_ctrl_handler_ref = HandlerRoutine(_win_ctrl_handler)
+                kernel32.SetConsoleCtrlHandler(self._win_ctrl_handler_ref, True)
+            except Exception as e:
+                try:
+                    self.logger.logger.warning(f"Could not register Windows console handler: {e}")
+                except Exception:
+                    pass
         try:
             # Create model paths yaml if needed
             self._create_model_paths_yaml()
             
-            while True:
+            while not shutdown_event.is_set():
                 process = self._launch_comfyui()
                 if not process:
                     self.logger.logger.error("Failed to start ComfyUI. Retrying in 10 seconds...")
                     time.sleep(10)
                     continue
                 
-                # Wait for server startup
-                start_time = time.time()
-                server_ready = False
-                
-                while time.time() - start_time < self.boot_wait_time:
-                    if self._is_server_responding():
-                        server_ready = True
-                        self.logger.logger.info("ComfyUI server is ready")
-                        break
-                    time.sleep(1)
+                # Reset readiness and last output timestamps
+                self._readiness_event.clear()
+                with self._last_output_lock:
+                    self._last_output_ts = time.time()
+
+                # Wait for server startup based on logs
+                self.logger.logger.info("Waiting for ComfyUI to become ready (log-based)...")
+                server_ready = self._readiness_event.wait(timeout=self.boot_wait_time)
+                if shutdown_event.is_set():
+                    if process and process.poll() is None:
+                        self._terminate_tree(process)
+                    break
                 
                 if not server_ready:
-                    self.logger.logger.error("Server failed to start within timeout")
-                    process.terminate()
-                    continue
+                    # Be lenient: continue monitoring instead of killing; many users suppress logs
+                    self.logger.logger.warning("No explicit readiness logs within timeout; continuing to monitor")
                 
                 # Monitor loop
                 try:
-                    while True:
+                    # Prime CPU percent for accurate readings
+                    try:
+                        parent_proc = psutil.Process(process.pid)
+                        _ = parent_proc.cpu_percent(interval=None)
+                    except psutil.Error:
+                        parent_proc = None
+                    quiet_cpu_accum = 0.0
+
+                    while not shutdown_event.is_set():
                         if process.poll() is not None:
                             self.logger.logger.error("ComfyUI process has terminated unexpectedly")
                             break
-                        
-                        if not self._is_server_responding():
-                            self.logger.logger.error("Server not responding")
-                            process.terminate()
+
+                        # Check for prolonged silence from the process (less aggressive)
+                        with self._last_output_lock:
+                            last = self._last_output_ts
+                        silent_secs = time.time() - last
+
+                        # Compute CPU usage across process tree
+                        cpu_total = 0.0
+                        if parent_proc is not None:
+                            try:
+                                cpu_total += parent_proc.cpu_percent(interval=None)
+                                for ch in parent_proc.children(recursive=True):
+                                    try:
+                                        cpu_total += ch.cpu_percent(interval=None)
+                                    except psutil.Error:
+                                        pass
+                            except psutil.Error:
+                                pass
+
+                        if cpu_total < self.quiet_cpu_threshold:
+                            quiet_cpu_accum += self.monitor_interval
+                        else:
+                            quiet_cpu_accum = 0.0
+
+                        if self.enable_no_output_restart and silent_secs > self.no_output_restart_secs and quiet_cpu_accum >= self.quiet_cpu_window_secs:
+                            self.logger.logger.error(
+                                f"No output for {int(silent_secs)}s and CPU quiet for {int(quiet_cpu_accum)}s; restarting"
+                            )
+                            self._terminate_tree(process)
                             break
                         
                         # Clean old logs periodically
@@ -226,17 +385,15 @@ comfyui:
                         time.sleep(self.monitor_interval)
                         
                 except KeyboardInterrupt:
-                    raise
+                    handle_sig(getattr(signal, "SIGINT", 2), None)
                 except Exception as e:
                     self.logger.logger.error(f"Error in monitoring loop: {e}")
-                    if process.poll() is None:
-                        process.terminate()
+                    if process and process.poll() is None:
+                        self._terminate_tree(process)
                     time.sleep(5)
-        
+            
         except KeyboardInterrupt:
-            self.logger.logger.info("Received shutdown signal")
-            if 'process' in locals() and process.poll() is None:
-                process.terminate()
+            handle_sig(getattr(signal, "SIGINT", 2), None)
         except Exception as e:
             self.logger.logger.error(f"Critical error: {e}")
         finally:
